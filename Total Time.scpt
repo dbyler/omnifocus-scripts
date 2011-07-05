@@ -23,7 +23,7 @@
 
 
 	# KNOWN BUGS #
-	-	If a selection 
+	-	Throws an error if launched from OmniFocus Toolbar.
 		
 *)
 
