@@ -34,6 +34,40 @@ property allNotifications : {"General", "Error"}
 property enabledNotifications : {"General", "Error"}
 property iconApplication : "OmniFocus.app"
 
+on notify(alertName, alertTitle, alertText)
+	if showAlert is false then
+		return
+	else if useGrowl is true then
+		--check to make sure Growl is running
+		tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
+		if GrowlRunning = 0 then
+			--try to activate Growl
+			try
+				do shell script "/Library/PreferencePanes/Growl.prefPane/Contents/Resources/GrowlHelperApp.app/Contents/MacOS/GrowlHelperApp > /dev/null 2>&1 &"
+				do shell script "~/Library/PreferencePanes/Growl.prefPane/Contents/Resources/GrowlHelperApp.app/Contents/MacOS/GrowlHelperApp > /dev/null 2>&1 &"
+			end try
+			delay 0.2
+			tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
+		end if
+		--notify
+		if GrowlRunning ≥ 1 then
+			try
+				tell application "GrowlHelperApp"
+					register as application growlAppName all notifications allNotifications default notifications allNotifications icon of application iconApplication
+					notify with name alertName title alertTitle application name growlAppName description alertText
+				end tell
+			end try
+		else
+			set alertText to alertText & " 
+ 
+p.s. Don't worry—the Growl notification failed but the script was successful."
+			display dialog alertText with icon 1
+		end if
+	else
+		display dialog alertText with icon 1
+	end if
+end notify
+
 tell application "OmniFocus"
 	tell front document
 		tell (first document window whose index is 1)
@@ -76,38 +110,3 @@ tell application "OmniFocus"
 	end tell
 	my notify(alertName, alertTitle, alertText)
 end tell
-
-
-on notify(alertName, alertTitle, alertText)
-	if showAlert is false then
-		return
-	else if useGrowl is true then
-		--check to make sure Growl is running
-		tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
-		if GrowlRunning = 0 then
-			--try to activate Growl
-			try
-				do shell script "/Library/PreferencePanes/Growl.prefPane/Contents/Resources/GrowlHelperApp.app/Contents/MacOS/GrowlHelperApp > /dev/null 2>&1 &"
-				do shell script "~/Library/PreferencePanes/Growl.prefPane/Contents/Resources/GrowlHelperApp.app/Contents/MacOS/GrowlHelperApp > /dev/null 2>&1 &"
-			end try
-			delay 0.2
-			tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
-		end if
-		--notify
-		if GrowlRunning ≥ 1 then
-			try
-				tell application "GrowlHelperApp"
-					register as application growlAppName all notifications allNotifications default notifications allNotifications icon of application iconApplication
-					notify with name alertName title alertTitle application name growlAppName description alertText
-				end tell
-			end try
-		else
-			set alertText to alertText & " 
- 
-p.s. Don't worry—the Growl notification failed but the script was successful."
-			display dialog alertText with icon 1
-		end if
-	else
-		display dialog alertText with icon 1
-	end if
-end notify
