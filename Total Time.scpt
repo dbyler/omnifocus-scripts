@@ -90,13 +90,18 @@ tell application "OmniFocus"
 				set selectedItem to value of item selectNum of theSelectedItems
 				set theClass to class of selectedItem
 				set theClassClass to class of theClass
-				if theClass is in {project, task} then
+				if theClass is in {project, task, inbox task} then
 					set estimate to estimated minutes of selectedItem
 					if estimate is not missing value then set totalMinutes to (totalMinutes + estimate)
 					set totalItems to (totalItems + 1)
 				end if
 				set selectNum to selectNum - 1
 			end repeat
+			if totalItems is 1 then
+				set itemSuffix to ""
+			else
+				set itemSuffix to "s"
+			end if
 			
 			set alertName to "General"
 			set alertTitle to "Script complete"
@@ -104,7 +109,7 @@ tell application "OmniFocus"
 			set modMinutes to (totalMinutes mod 60)
 			set totalHours to (totalMinutes / 60 as integer)
 			
-			set alertText to totalHours & "h " & modMinutes & "m total for " & totalItems & " item(s)" as string
+			set alertText to totalHours & "h " & modMinutes & "m total for " & totalItems & " item" & itemSuffix as string
 			
 		end tell
 	end tell
