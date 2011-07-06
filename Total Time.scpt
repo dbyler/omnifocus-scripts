@@ -23,7 +23,7 @@
 
 
 	# KNOWN BUGS #
-	-	Throws an error if launched from OmniFocus Toolbar.
+	-	None
 		
 *)
 
