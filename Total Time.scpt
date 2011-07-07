@@ -8,11 +8,13 @@
 	
 	Copyright © 2011 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php) 
-	(I.e., do whatever you want with it.)
+	(TL;DR: do whatever you want with it.)
 
 
 	# CHANGE HISTORY #
 
+	version 0.2: Streamlined calls to OmniFocus with Rob Trew's input (Thanks, Rob!)
+				Reorganized script for better readability
 	version 0.1: Initial release
 
 
@@ -33,6 +35,45 @@ property growlAppName : "Dan's Scripts"
 property allNotifications : {"General", "Error"}
 property enabledNotifications : {"General", "Error"}
 property iconApplication : "OmniFocus.app"
+
+on main()
+	tell application "OmniFocus"
+		tell content of front document window of front document
+			set totalMinutes to 0
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
+			set totalItems to count of validSelectedItemsList
+			
+			if totalItems is 0 then
+				set alertName to "Error"
+				set alertTitle to "Script failure"
+				set alertText to "No valid task(s) selected"
+				my notify(alertName, alertTitle, alertText)
+				return
+			end if
+			
+			repeat with thisItem in validSelectedItemsList
+				set thisEstimate to estimated minutes of thisItem
+				if thisEstimate is not missing value then set totalMinutes to totalMinutes + thisEstimate
+			end repeat
+		end tell
+	end tell
+	
+	if totalItems is 1 then
+		set itemSuffix to ""
+	else
+		set itemSuffix to "s"
+	end if
+	
+	set alertName to "General"
+	set alertTitle to "Script complete"
+	
+	set modMinutes to (totalMinutes mod 60)
+	set totalHours to (totalMinutes / 60 as integer)
+	
+	set alertText to totalHours & "h " & modMinutes & "m total for " & totalItems & " item" & itemSuffix as string
+	
+	my notify(alertName, alertTitle, alertText)
+end main
 
 on notify(alertName, alertTitle, alertText)
 	if showAlert is false then
@@ -68,50 +109,4 @@ p.s. Don't worry—the Growl notification failed but the script was successful."
 	end if
 end notify
 
-tell application "OmniFocus"
-	tell front document
-		tell (first document window whose index is 1)
-			set theSelectedItems to selected trees of content
-			set numSelectedItems to (count items of theSelectedItems)
-			if numSelectedItems is 0 then
-				set alertName to "Error"
-				set alertTitle to "Script failure"
-				set alertText to "No valid task(s) selected"
-				my notify(alertName, alertTitle, alertText)
-				return
-			end if
-			
-			set totalMinutes to 0
-			set totalHours to 0
-			set totalItems to 0
-			set selectNum to numSelectedItems
-			set successTot to 0
-			repeat while selectNum > 0
-				set selectedItem to value of item selectNum of theSelectedItems
-				set theClass to class of selectedItem
-				set theClassClass to class of theClass
-				if theClass is in {project, task, inbox task} then
-					set estimate to estimated minutes of selectedItem
-					if estimate is not missing value then set totalMinutes to (totalMinutes + estimate)
-					set totalItems to (totalItems + 1)
-				end if
-				set selectNum to selectNum - 1
-			end repeat
-			if totalItems is 1 then
-				set itemSuffix to ""
-			else
-				set itemSuffix to "s"
-			end if
-			
-			set alertName to "General"
-			set alertTitle to "Script complete"
-			
-			set modMinutes to (totalMinutes mod 60)
-			set totalHours to (totalMinutes / 60 as integer)
-			
-			set alertText to totalHours & "h " & modMinutes & "m total for " & totalItems & " item" & itemSuffix as string
-			
-		end tell
-	end tell
-	my notify(alertName, alertTitle, alertText)
-end tell
+main()
