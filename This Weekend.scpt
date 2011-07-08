@@ -44,7 +44,7 @@
 *)
 
 -- To change your weekend start/stop date/time, modify the following properties
-property setDueDate : true --set to False if you don't want to change the due date
+property setDueDate : false --set to False if you don't want to change the due date
 property weEndDay : Sunday
 property weEndTime : 17 --due time in hours (24 hr clock)
 property weStartDay : Friday

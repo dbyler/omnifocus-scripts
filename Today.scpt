@@ -67,7 +67,7 @@
 -- To change settings, modify the following properties
 
 --The following setting changes script mode. Options: "start" or "due" (quotes needed)
-property mode : "due"
+property mode : "start"
 
 property showSummaryNotification : false --if true, will display success notifications
 property useGrowl : true --if true, will use Growl for success/failure alerts
