@@ -1,7 +1,8 @@
 ﻿(*
 	# DESCRIPTION #
 	
-	This script "snoozes" the currently selected actions or projects by setting the start date to given number of days in the future.
+	This script "snoozes" the currently selected actions or projects by setting the start date to 
+	given number of days in the future.
 	
 	
 	# LICENSE #
@@ -14,6 +15,7 @@
 	# CHANGE HISTORY #
 	
 	0.3 (2011-07-07)
+	-	New option to set start time (default: 8am)
 	-	Reorganized; incorporated Rob Trew's method to get items from OmniFocus
 	-	No longer fails when a Grouping divider is selected
 	-	Fixes potential issue when launching from OmniFocus toolbar
@@ -48,6 +50,7 @@
 property showSummaryNotification : false --if true, will display success notifications
 property useGrowl : true --if true, will use Growl for success/failure alerts
 property defaultOffset : 1 --number of days to snooze by default
+property defaultStartTime : 8 --default time to use (in hours, 24-hr clock)
 
 -- Don't change these
 property alertItemNum : ""
@@ -76,7 +79,7 @@ on main()
 			set daysOffset to (the text returned of the result) as integer
 			
 			--Perform action
-			set todayStart to (current date) - (get time of (current date))
+			set todayStart to (current date) - (get time of (current date)) + (defaultStartTime * 3600)
 			set successTot to 0
 			set autosave to false
 			repeat with thisItem in validSelectedItemsList
