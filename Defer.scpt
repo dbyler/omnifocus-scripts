@@ -16,6 +16,8 @@
 	# CHANGE HISTORY#
 	
 	0.4 (2011-07-07)
+	-	New option to set start time (Default: 8am)
+	-	New snoozeUnscheduledItems option (default: True) lets you pus the start date of unscheduled items.
 	-	No longer fails when a Grouping divider is selected
 	-	Reorganized; incorporated Rob Trew's method to get items from OmniFocus
 	-	Fixes potential issue when launching from OmniFocus toolbar
@@ -31,11 +33,17 @@
 		-	Reinstated original Growl code since the Growl-agnostic code broke in Snow Leopard
 	
 	0.2
-		-	Incorporated Curt Clifton's bug fixes to make script more reliable when dealing with multiple items. Thanks, Curt!
+		-	Incorporated Curt Clifton's bug fixes to make script more reliable when dealing with multiple items.
+			Thanks, Curt!
 		-	Added some error suppression to deal with deferring from Context mode
 		-	Defers both start and due dates by default.
-		-	Incorporates new method that doesn't call Growl directly. This code should be friendly for machines that don't have Growl installed. In my testing, I found that GrowlHelperApp crashes on nearly 10% of AppleScript calls, so the script checks for GrowlHelperApp and launches it if not running. (Thanks to Nanovivid from forums.cocoaforge.com/viewtopic.php?p=32584 and Macfaninpdx from forums.macrumors.com/showthread.php?t=423718 for the information needed to get this working
-		-	All that said... if you run from the toolbar frequently, I'd recommend  turning alerts off since Growl slows down the script so much
+		-	Incorporates new method that doesn't call Growl directly. This code should be friendly for machines
+			that don't have Growl installed. In my testing, I found that GrowlHelperApp crashes on nearly 10%
+			of AppleScript calls, so the script checks for GrowlHelperApp and launches it if not running. (Thanks 
+			to Nanovivid from forums.cocoaforge.com/viewtopic.php?p=32584 and Macfaninpdx from 
+			forums.macrumors.com/showthread.php?t=423718 for the information needed to get this working
+		-	All that said... if you run from the toolbar frequently, I'd recommend  turning alerts off since Growl 
+			slows down the script so much
 		
 	0.1: Original release
 
@@ -53,9 +61,11 @@
 *)
 
 -- To change settings, modify the following properties
+property snoozeUnscheduledItems : true --if True, when deferring Start AND Due dates, will set start date to given # of days in the future
 property showSummaryNotification : false --if true, will display success notifications
 property useGrowl : true --if true, will use Growl for success/failure alerts
 property defaultOffset : 1 --number of days to defer by default
+property defaultStartTime : 8 --default time to use (in hours, 24-hr clock)
 
 -- Don't change these
 property alertItemNum : ""
@@ -95,8 +105,9 @@ on main()
 			--Perform action
 			set successTot to 0
 			set autosave to false
+			set todayStart to (current date) - (get time of (current date)) + (defaultStartTime * 3600)
 			repeat with thisItem in validSelectedItemsList
-				set succeeded to my defer(thisItem, daysOffset, modifyStartDate)
+				set succeeded to my defer(thisItem, daysOffset, modifyStartDate, todayStart)
 				if succeeded then set successTot to successTot + 1
 			end repeat
 			set autosave to true
@@ -114,18 +125,23 @@ on main()
 	end if
 end main
 
-on defer(selectedItem, daysOffset, modifyStartDate)
+on defer(selectedItem, daysOffset, modifyStartDate, todayStart)
 	set success to false
 	tell application "OmniFocus"
 		try
-			set theDueDate to due date of selectedItem
-			if (theDueDate is not missing value) then
-				set due date of selectedItem to my offsetDateByDays(theDueDate, daysOffset)
-			end if
 			if modifyStartDate then
 				set theStartDate to start date of selectedItem
-				if (theStartDate is not missing value) then
+				if (theStartDate is not missing value) then --There's a preexisting start date
 					set start date of selectedItem to my offsetDateByDays(theStartDate, daysOffset)
+				end if
+			end if
+			set theDueDate to due date of selectedItem
+			if (theDueDate is not missing value) then --There's a preexisting due date
+				set due date of selectedItem to my offsetDateByDays(theDueDate, daysOffset)
+			else if snoozeUnscheduledItems then
+				if start date of selectedItem is missing value then
+					set test to my offsetDateByDays(todayStart, daysOffset)
+					set start date of selectedItem to my offsetDateByDays(todayStart, daysOffset)
 				end if
 			end if
 			set success to true
