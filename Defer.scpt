@@ -1,16 +1,24 @@
-(*
-	# Description #
+﻿(*
+	# DESCRIPTION #
 	
-	This script takes the currently selected actions or projects and defers, or "snoozes", them by the user-specified number of days.
-	The user may snooze just the due date or both the start and due dates (useful for skipping weekends for daily recurring tasks).
+	This script takes the currently selected actions or projects and offsets their dates by the
+	user-specified number of days. The user may defer just the due date or both the start and
+	due dates (useful for skipping weekends for daily recurring tasks).
 	
 	
-	# License #
+	# LICENSE #
 
-	Copyright © 2008-2010 Dan Byler (contact: dbyler@gmail.com)
+	Copyright © 2008-2011 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php)
+	(TL;DR: no warranty, do whatever you want with it.)
+
 	
-	# Version history #
+	# CHANGE HISTORY#
+	
+	0.4 (2011-07-07)
+	-	No longer fails when a Grouping divider is selected
+	-	Reorganized; incorporated Rob Trew's method to get items from OmniFocus
+	-	Fixes potential issue when launching from OmniFocus toolbar
 	
 	0.3c (2010-06-21)
 		-	Actual fix for autosave
@@ -32,22 +40,24 @@
 	0.1: Original release
 
 
-	# Installation #
+	# INSTALLATION #
 
 	-	Copy to ~/Library/Scripts/Applications/Omnifocus
  	-	If desired, add to the OmniFocus toolbar using View > Customize Toolbar... within OmniFocus
 
-	# Known bugs #
-		• When the script is invoked from the OmniFocus toolbar and canceled, OmniFocus returns an error. This issue does not occur when invoked from the script menu, a Quicksilver trigger, etc.
-		
-	To do:
-		- Optimize Growl notification so it runs in the background
+
+	# KNOWN ISSUES #
+	-	When the script is invoked from the OmniFocus toolbar and canceled, OmniFocus displays an alert.
+		This does not occur when invoked from another launcher (script menu, FastScripts LaunchBar, etc).
 
 *)
 
-property showAlert : false --if true, will display success/failure alerts
+-- To change settings, modify the following properties
+property showSummaryNotification : false --if true, will display success notifications
 property useGrowl : true --if true, will use Growl for success/failure alerts
-property defaultSnooze : 1 --number of days to defer by default
+property defaultOffset : 1 --number of days to defer by default
+
+-- Don't change these
 property alertItemNum : ""
 property alertDayNum : ""
 property growlAppName : "Dan's Scripts"
@@ -55,13 +65,13 @@ property allNotifications : {"General", "Error"}
 property enabledNotifications : {"General", "Error"}
 property iconApplication : "OmniFocus.app"
 
-
-tell application "OmniFocus"
-	tell front document
-		tell (first document window whose index is 1)
-			set theSelectedItems to selected trees of content
-			set numItems to (count items of theSelectedItems)
-			if numItems is 0 then
+on main()
+	tell application "OmniFocus"
+		tell content of front document window of front document
+			--Get selection
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
+			set totalItems to count of validSelectedItemsList
+			if totalItems is 0 then
 				set alertName to "Error"
 				set alertTitle to "Script failure"
 				set alertText to "No valid task(s) selected"
@@ -69,14 +79,9 @@ tell application "OmniFocus"
 				return
 			end if
 			
-			display dialog "Defer for how many days?" default answer defaultSnooze buttons {"Cancel", "OK"} default button 2
-			(* if (the button returned of the result) is not "OK" then
-				return
-			end if  *)
-			set snoozeLength to (the text returned of the result) as integer
-			if snoozeLength is not 1 then
-				set alertDayNum to "s"
-			end if
+			--User options
+			display dialog "Defer for how many days (from existing)?" default answer defaultOffset buttons {"Cancel", "OK"} default button 2
+			set daysOffset to (the text returned of the result) as integer
 			set changeScopeQuery to display dialog "Modify start and due dates?" buttons {"Cancel", "Due Only", "Start and Due"} default button 3 with icon caution giving up after 60
 			set changeScope to button returned of changeScopeQuery
 			if changeScope is "Cancel" then
@@ -86,53 +91,55 @@ tell application "OmniFocus"
 			else if changeScope is "Due Only" then
 				set modifyStartDate to false
 			end if
-			set selectNum to numItems
+			
+			--Perform action
 			set successTot to 0
 			set autosave to false
-			repeat while selectNum > 0
-				set selectedItem to value of item selectNum of theSelectedItems
-				set succeeded to my defer(selectedItem, snoozeLength, modifyStartDate)
+			repeat with thisItem in validSelectedItemsList
+				set succeeded to my defer(thisItem, daysOffset, modifyStartDate)
 				if succeeded then set successTot to successTot + 1
-				set selectNum to selectNum - 1
 			end repeat
 			set autosave to true
-			set alertName to "General"
-			set alertTitle to "Script complete"
-			if successTot > 1 then set alertItemNum to "s"
-			set alertText to successTot & " item" & alertItemNum & " deferred " & snoozeLength & " day" & alertDayNum & ". (" & changeScope & ")" as string
 		end tell
 	end tell
-	my notify(alertName, alertTitle, alertText)
-end tell
+	
+	--Display summary notification
+	if showSummaryNotification then
+		set alertName to "General"
+		set alertTitle to "Script complete"
+		if daysOffset is not 1 then set alertDayNum to "s"
+		if successTot > 1 then set alertItemNum to "s"
+		set alertText to successTot & " item" & alertItemNum & " deferred " & daysOffset & " day" & alertDayNum & ". (" & changeScope & ")" as string
+		my notify(alertName, alertTitle, alertText)
+	end if
+end main
 
-on defer(selectedItem, snoozeLength, modifyStartDate)
+on defer(selectedItem, daysOffset, modifyStartDate)
 	set success to false
 	tell application "OmniFocus"
 		try
 			set theDueDate to due date of selectedItem
 			if (theDueDate is not missing value) then
-				set newDue to (theDueDate + (86400 * snoozeLength))
-				set due date of selectedItem to newDue
-				set success to true
+				set due date of selectedItem to my offsetDateByDays(theDueDate, daysOffset)
 			end if
-			if modifyStartDate is true then
+			if modifyStartDate then
 				set theStartDate to start date of selectedItem
 				if (theStartDate is not missing value) then
-					set newStart to (theStartDate + (86400 * snoozeLength))
-					set start date of selectedItem to newStart
-					set success to true
+					set start date of selectedItem to my offsetDateByDays(theStartDate, daysOffset)
 				end if
 			end if
+			set success to true
 		end try
 	end tell
 	return success
 end defer
 
+on offsetDateByDays(myDate, daysOffset)
+	return myDate + (86400 * daysOffset)
+end offsetDateByDays
 
 on notify(alertName, alertTitle, alertText)
-	if showAlert is false then
-		return
-	else if useGrowl is true then
+	if useGrowl then
 		--check to make sure Growl is running
 		tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
 		if GrowlRunning = 0 then
@@ -162,3 +169,5 @@ p.s. Don't worry—the Growl notification failed but the script was successful."
 		display dialog alertText with icon 1
 	end if
 end notify
+
+main()

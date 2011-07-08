@@ -13,8 +13,10 @@
 
 	# CHANGE HISTORY #
 
-	version 0.2: Streamlined calls to OmniFocus with Rob Trew's input (Thanks, Rob!)
-				Reorganized script for better readability
+	version 0.2 (2011-07-07):
+	-	Streamlined calls to OmniFocus with Rob Trew's input (Thanks, Rob!)
+	-	Reorganized script for better readability
+	
 	version 0.1: Initial release
 
 
@@ -29,8 +31,10 @@
 		
 *)
 
-property showAlert : true --if true, will display success/failure alerts
+-- To change settings, modify the following property
 property useGrowl : true --if true, will use Growl for success/failure alerts
+
+-- Don't change these
 property growlAppName : "Dan's Scripts"
 property allNotifications : {"General", "Error"}
 property enabledNotifications : {"General", "Error"}
@@ -39,10 +43,10 @@ property iconApplication : "OmniFocus.app"
 on main()
 	tell application "OmniFocus"
 		tell content of front document window of front document
+			--Get selection
 			set totalMinutes to 0
 			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
 			set totalItems to count of validSelectedItemsList
-			
 			if totalItems is 0 then
 				set alertName to "Error"
 				set alertTitle to "Script failure"
@@ -51,34 +55,30 @@ on main()
 				return
 			end if
 			
+			--Perform action
 			repeat with thisItem in validSelectedItemsList
 				set thisEstimate to estimated minutes of thisItem
 				if thisEstimate is not missing value then set totalMinutes to totalMinutes + thisEstimate
 			end repeat
+			set modMinutes to (totalMinutes mod 60)
+			set totalHours to (totalMinutes / 60 as integer)
 		end tell
 	end tell
 	
+	--Show summary notification
 	if totalItems is 1 then
 		set itemSuffix to ""
 	else
 		set itemSuffix to "s"
 	end if
-	
 	set alertName to "General"
 	set alertTitle to "Script complete"
-	
-	set modMinutes to (totalMinutes mod 60)
-	set totalHours to (totalMinutes / 60 as integer)
-	
 	set alertText to totalHours & "h " & modMinutes & "m total for " & totalItems & " item" & itemSuffix as string
-	
 	my notify(alertName, alertTitle, alertText)
 end main
 
 on notify(alertName, alertTitle, alertText)
-	if showAlert is false then
-		return
-	else if useGrowl is true then
+	if useGrowl then
 		--check to make sure Growl is running
 		tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
 		if GrowlRunning = 0 then

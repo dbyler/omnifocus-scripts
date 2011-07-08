@@ -1,13 +1,26 @@
-(*
+﻿(*
 	# DESCRIPTION #
 
-	This script takes the currently selected actions or projects and sets them to be due tomorrow. Works on tasks past due, currently due, or due in the future.
+	This script takes the currently selected actions or projects and sets them for action tomorrow.
 	
-	Logic applied to each item:
+	**IMPORTANT: Now has two modes: "Start" mode and "Due" mode. Start mode is for people
+	who use start dates to plan for the day; Due mode is for people who use Due dates for the same.
+	It is now my opinion that Start dates are more useful for day-to-day planning, but this script is 
+	intended to provide flexibility in whatever system you use.
+	
+	By default, this script will now set start dates, but you can change this in the settings below.**
+
+	## START MODE LOGIC ##
+	For each item:
 		- If no original due date, sets due to tomorrow at the set time
-		- If original due date, sets due to tomorrow at the *original* due time
-		- If original due date AND start date, advances start date by same # of days as due date (this is to respect parameters of repeating actions)
-		- Ignores start date if there's no due date already assigned to a task
+
+	## DUE MODE LOGIC ##
+	For each item:
+	-	If there's no existing due date: sets Due to tomorrow (at time specified in script settings)
+	-	If there's an existing due date: sets Due to tomorrow at the *original* due time
+	-	If there's an existing due date AND start date: advances start date by same # of days as due 
+		date (this is to respect parameters of repeating actions)
+	-	Ignores start date if there's no due date already assigned to a task
 	
 	
 	# LICENSE #
@@ -17,6 +30,12 @@
 	
 
 	# CHANGE HISTORY #
+
+	version 0.3 (2011-07-07):
+	-	New setting: "Start" or "Due" modes (see above)
+	-	No longer fails when a Grouping divider is selected
+	-	Streamlined calls to OmniFocus with Rob Trew's input (Thanks, Rob!)
+	-	Reorganized script for better readability
 
 	version 0.2c (2010-06-22)
 	-	Actual fix for autosave
@@ -41,81 +60,117 @@
 		
 *)
 
-property showAlert : false --if true, will display success/failure alerts
+--The following setting changes script mode. Options: "start" or "due" (quotes needed)
+property mode : "due"
+
+property showSummaryNotification : false --if true, will display success notifications
 property useGrowl : true --if true, will use Growl for success/failure alerts
---property defaultSnooze : 1 --number of days to defer by default
+property startTime : 6 --Start hour for items not previously assigned a start time (24 hr clock)
+property dueTime : 17 --Due hour for items not previously assigned a due time (24 hr clock)
+
+-- Don't change these
 property alertItemNum : ""
 property alertDayNum : ""
 property growlAppName : "Dan's Scripts"
 property allNotifications : {"General", "Error"}
 property enabledNotifications : {"General", "Error"}
 property iconApplication : "OmniFocus.app"
-property dueTime : 17 --Time of due for items not previously assigned a due time (24 hr clock)
---property homeDueTime : 20 --If item is in "Home" category, time of due
 
-tell application "OmniFocus"
-	tell front document
-		tell (first document window whose index is 1)
-			set theSelectedItems to selected trees of content
-			set numItems to (count items of theSelectedItems)
-			if numItems is 0 then
+on main()
+	tell application "OmniFocus"
+		tell content of front document window of front document
+			--Get selection
+			set totalMinutes to 0
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
+			set totalItems to count of validSelectedItemsList
+			if totalItems is 0 then
 				set alertName to "Error"
 				set alertTitle to "Script failure"
 				set alertText to "No valid task(s) selected"
 				my notify(alertName, alertTitle, alertText)
 				return
 			end if
-			set currDate to (current date) - (time of (current date))
-			set currDate to currDate + 86400
-			set selectNum to numItems
+			
+			--Perform action
 			set successTot to 0
 			set autosave to false
-			repeat while selectNum > 0
-				set selectedItem to value of item selectNum of theSelectedItems
-				set succeeded to my tomorrow(selectedItem, currDate)
-				if succeeded then set successTot to successTot + 1
-				set selectNum to selectNum - 1
-			end repeat
+			set newDate to (current date) - (time of (current date)) + 86400
+			if mode is "start" then
+				repeat with thisItem in validSelectedItemsList
+					set succeeded to my startTomorrow(thisItem, newDate)
+					if succeeded then set successTot to successTot + 1
+				end repeat
+			else if mode is "due" then
+				repeat with thisItem in validSelectedItemsList
+					set succeeded to my dueTomorrow(thisItem, newDate)
+					if succeeded then set successTot to successTot + 1
+				end repeat
+			else
+				set alertName to "Error"
+				set alertTitle to "Script failure"
+				set alertText to "Improper mode setting"
+				my notify(alertName, alertTitle, alertText)
+			end if
 			set autosave to true
-			set alertName to "General"
-			set alertTitle to "Script complete"
-			if successTot > 1 then set alertItemNum to "s"
-			set alertText to successTot & " item" & alertItemNum & " now due tomorrow." as string
 		end tell
 	end tell
-	my notify(alertName, alertTitle, alertText)
-end tell
+	
+	--Display summary notification
+	if showSummaryNotification then
+		set alertName to "General"
+		set alertTitle to "Script complete"
+		if successTot > 1 then set alertItemNum to "s"
+		set alertText to successTot & " item" & alertItemNum & " now due today." as string
+		my notify(alertName, alertTitle, alertText)
+	end if
+end main
 
-on tomorrow(selectedItem, currDate)
+on startTomorrow(selectedItem, newDate)
 	set success to false
 	tell application "OmniFocus"
 		try
-			set theDueDate to due date of selectedItem
-			if (theDueDate is not missing value) then
-				set theDueStart to theDueDate - (time of theDueDate)
-				set theDelta to (currDate - theDueStart) / 86400
-				set newDue to (theDueDate + (theDelta * days))
-				set due date of selectedItem to newDue
-				set theStartDate to start date of selectedItem
-				if (theStartDate is not missing value) then
-					set newStart to (theStartDate + (theDelta * days))
-					set start date of selectedItem to newStart
-				end if
+			set originalStartDateTime to start date of selectedItem
+			if (originalStartDateTime is not missing value) then
+				--Set new start date with original start time
+				set start date of selectedItem to (newDate + (time of originalStartDateTime))
 				set success to true
 			else
-				set due date of selectedItem to (currDate + (dueTime * hours))
+				set start date of selectedItem to (newDate + (startTime * hours))
 				set success to true
 			end if
 		end try
 	end tell
-	return {success}
-end tomorrow
+	return success
+end startTomorrow
 
+on dueTomorrow(selectedItem, newDate)
+	set success to false
+	tell application "OmniFocus"
+		try
+			set originalDueDateTime to due date of selectedItem
+			if (originalDueDateTime is not missing value) then
+				--Set new due date with original due time
+				set originalDueStartDate to originalDueDateTime - (time of originalDueDateTime)
+				set theDelta to (newDate - originalDueStartDate) / 86400
+				set newDueDateTime to (originalDueDateTime + (theDelta * days))
+				set due date of selectedItem to newDueDateTime
+				set originalStartDateTime to start date of selectedItem
+				if (originalStartDateTime is not missing value) then
+					set newStartDateTime to (originalStartDateTime + (theDelta * days))
+					set start date of selectedItem to newStartDateTime
+				end if
+				set success to true
+			else
+				set due date of selectedItem to (newDate + (dueTime * hours))
+				set success to true
+			end if
+		end try
+	end tell
+	return success
+end dueTomorrow
 
 on notify(alertName, alertTitle, alertText)
-	if showAlert is false then
-		return
-	else if useGrowl is true then
+	if useGrowl then
 		--check to make sure Growl is running
 		tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
 		if GrowlRunning = 0 then
@@ -145,3 +200,5 @@ p.s. Don't worry—the Growl notification failed but the script was successful."
 		display dialog alertText with icon 1
 	end if
 end notify
+
+main()

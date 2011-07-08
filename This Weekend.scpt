@@ -1,7 +1,11 @@
-(*
+﻿(*
 	# DESCRIPTION #
 	
-	This script takes the currently selected actions or projects and sets them to start and finish on the coming weekend. (If a weekend is currently in progress, the items will be set for the current weekend.)
+	This script takes the currently selected actions or projects and sets them for action this weekend.
+	(If a weekend is currently in progress, the items will be set for the *current* weekend.)
+	
+	**IMPORTANT: The script will now always set a start date. Whether it sets a due date is up to you.
+	Change this setting with the setDueDate property below.**
 	
 	The dates and times are set by variables, so you can modify to meet your weekend.
 	
@@ -12,6 +16,12 @@
 	
 
 	# CHANGE HISTORY #
+	
+	0.2 (2011-07-07)
+	-	Setting a due date is now optional (see settings below)
+	-	No longer fails when a Grouping divider is selected
+	-	Reorganized; incorporated Rob Trew's method to get items from OmniFocus
+	-	Fixes potential issue when launching from OmniFocus toolbar
 
 	0.1c (2010-06-22)
 		-	Actual fix for autosave
@@ -34,13 +44,14 @@
 *)
 
 -- To change your weekend start/stop date/time, modify the following properties
-property weStartDay : Friday
-property weStartTime : 20 --due time in hrs (24 hr clock)
+property setDueDate : true --set to False if you don't want to change the due date
 property weEndDay : Sunday
 property weEndTime : 17 --due time in hours (24 hr clock)
+property weStartDay : Friday
+property weStartTime : 20 --due time in hrs (24 hr clock)
 
 --To enable alerts, change these settings to True _and_ uncomment
-property showAlert : false --if true, will display success/failure alerts
+property showSummaryNotification : false --if true, will display success notifications
 property useGrowl : true --if true, will use Growl for success/failure alerts
 
 -- Don't change these
@@ -52,13 +63,17 @@ property allNotifications : {"General", "Error"}
 property enabledNotifications : {"General", "Error"}
 property iconApplication : "OmniFocus.app"
 
-tell application "OmniFocus"
-	tell front document
-		tell (first document window whose index is 1)
-			set theSelectedItems to selected trees of content
-			set numItems to (count items of theSelectedItems)
-			if numItems is 0 then
-				my notify("Error", "Script failure", "No valid task(s) selected")
+on main()
+	tell application "OmniFocus"
+		tell content of front document window of front document
+			--Get selection
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
+			set totalItems to count of validSelectedItemsList
+			if totalItems is 0 then
+				set alertName to "Error"
+				set alertTitle to "Script failure"
+				set alertText to "No valid task(s) selected"
+				my notify(alertName, alertTitle, alertText)
 				return
 			end if
 			
@@ -78,41 +93,38 @@ tell application "OmniFocus"
 			set startDate to dueDate - diff
 			
 			--Perform action
-			set selectNum to numItems
 			set successTot to 0
 			set autosave to false
-			repeat while selectNum > 0
-				set selectedItem to value of item selectNum of theSelectedItems
-				set succeeded to my changeDate(selectedItem, startDate, dueDate)
+			repeat with thisItem in validSelectedItemsList
+				set succeeded to my setDate(thisItem, startDate, dueDate)
 				if succeeded then set successTot to successTot + 1
-				set selectNum to selectNum - 1
 			end repeat
 			set autosave to true
-			
-			--Set up alert according to preferences
-			if successTot > 1 then set alertItemNum to "s"
-			set alertText to successTot & " item" & alertItemNum & " now due this weekend." as string
 		end tell
 	end tell
-	my notify("General", "Script complete", alertText)
-end tell
+	
+	--Display summary notification
+	if showSummaryNotification then
+		if successTot > 1 then set alertItemNum to "s"
+		set alertText to successTot & " item" & alertItemNum & " now due this weekend." as string
+		my notify("General", "Script complete", alertText)
+	end if
+end main
 
-on changeDate(selectedItem, startDate, dueDate)
+on setDate(selectedItem, startDate, dueDate)
 	set success to false
 	tell application "OmniFocus"
 		try
 			set start date of selectedItem to startDate
-			set due date of selectedItem to dueDate
+			if setDueDate then set due date of selectedItem to dueDate
 			set success to true
 		end try
 	end tell
-	return {success}
-end changeDate
+	return success
+end setDate
 
 on notify(alertName, alertTitle, alertText)
-	if showAlert is false then
-		return
-	else if useGrowl is true then
+	if useGrowl then
 		--check to make sure Growl is running
 		tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
 		if GrowlRunning = 0 then
@@ -142,3 +154,5 @@ p.s. Don't worry—the Growl notification failed but the script was successful."
 		display dialog alertText with icon 1
 	end if
 end notify
+
+main()
