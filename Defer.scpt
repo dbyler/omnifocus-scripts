@@ -17,7 +17,7 @@
 	
 	0.4 (2011-07-07)
 	-	New option to set start time (Default: 8am)
-	-	New snoozeUnscheduledItems option (default: True) lets you pus the start date of unscheduled items.
+	-	New snoozeUnscheduledItems option (default: True) lets you push the start date of unscheduled items.
 	-	No longer fails when a Grouping divider is selected
 	-	Reorganized; incorporated Rob Trew's method to get items from OmniFocus
 	-	Fixes potential issue when launching from OmniFocus toolbar
