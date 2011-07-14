@@ -16,9 +16,9 @@
 	# CHANGE HISTORY#
 	
 	0.5 (2011-07-14)
-	-	Now warns for mismatches between "actual" and "effective" Due dates. Such a mismatch would 
-		occur if a parent or ancestor item has an earlier Due date than the selected item. This warning can
-		be suppressed by setting "warnOnDateMismatch" property to "false".
+	-	Now warns for mismatches between "actual" and "effective" Start and Due dates. Such mismatches 
+		occur if a parent or ancestor item has an earlier Due date (or later Start date) than the selected item.
+		This warning can be suppressed by setting "warnOnDateMismatch" property to "false".
 
 	-	New "promptForChangeScope" setting lets users bypass the second dialog box if they always change
 		the same parameters (Start AND Due dates, or just Due dates). Default setting: enabled.
@@ -148,10 +148,17 @@ on defer(selectedItem, daysOffset, modifyStartDate, todayStart)
 			set {startAncestor, effectiveStartDate} to my getEffectiveStartDate(selectedItem, start date of selectedItem)
 			set realDueDate to due date of selectedItem
 			set {dueAncestor, effectiveDueDate} to my getEffectiveDueDate(selectedItem, due date of selectedItem)
-			
 			if modifyStartDate then
 				if (realStartDate is not missing value) then --There's a preexisting start date
 					set start date of selectedItem to my offsetDateByDays(realStartDate, daysOffset)
+					if warnOnDateMismatch then
+						if realStartDate is not effectiveStartDate then
+							set alertText to "\"" & (name of contents of selectedItem) & ¬
+								"\" has a later effective start date inherited from \"" & (name of contents of dueAncestor) & ¬
+								"\". That ancestor item has not been changed."
+							my notifyWithSticky("Error", "Possible Start Date Mismatch", alertText)
+						end if
+					end if
 				end if
 			end if
 			if (realDueDate is not missing value) then --There's a preexisting due date
@@ -163,7 +170,7 @@ on defer(selectedItem, daysOffset, modifyStartDate, todayStart)
 					set alertText to "\"" & (name of contents of selectedItem) & ¬
 						"\" has an earlier effective due date inherited from \"" & (name of contents of dueAncestor) & ¬
 						"\". That ancestor item has not been changed."
-					my notifyWithSticky("Error", "Possible Date Mismatch", alertText)
+					my notifyWithSticky("Error", "Possible Due Date Mismatch", alertText)
 				end if
 			else if snoozeUnscheduledItems then
 				if start date of selectedItem is missing value then
