@@ -15,6 +15,14 @@
 	
 	# CHANGE HISTORY#
 	
+	0.5 (2011-07-14)
+	-	Now warns for mismatches between "actual" and "effective" Due dates. Such a mismatch would 
+		occur if a parent or ancestor item has an earlier Due date than the selected item. This warning can
+		be suppressed by setting "warnOnDateMismatch" property to "false".
+
+	-	New "promptForChangeScope" setting lets users bypass the second dialog box if they always change
+		the same parameters (Start AND Due dates, or just Due dates). Default setting: enabled.
+	
 	0.4 (2011-07-07)
 	-	New option to set start time (Default: 8am)
 	-	New snoozeUnscheduledItems option (default: True) lets you push the start date of unscheduled items.
@@ -66,6 +74,11 @@ property showSummaryNotification : false --if true, will display success notific
 property useGrowl : true --if true, will use Growl for success/failure alerts
 property defaultOffset : 1 --number of days to defer by default
 property defaultStartTime : 8 --default time to use (in hours, 24-hr clock)
+property warnOnDateMismatch : true --if True, warns you if there's a mismatch between a deferred item's actual and effective Due date. An effective due date is set by a parent task or project.
+
+--If you always want to change the same type of information--(Start AND Due dates) OR (Just Due dates)--change promptForChangeScope to false
+property promptForChangeScope : false
+property changeScope : "Start and Due" --options: "Start and Due", "Due Only"
 
 -- Don't change these
 property alertItemNum : ""
@@ -92,11 +105,13 @@ on main()
 			--User options
 			display dialog "Defer for how many days (from existing)?" default answer defaultOffset buttons {"Cancel", "OK"} default button 2
 			set daysOffset to (the text returned of the result) as integer
-			set changeScopeQuery to display dialog "Modify start and due dates?" buttons {"Cancel", "Due Only", "Start and Due"} default button 3 with icon caution giving up after 60
-			set changeScope to button returned of changeScopeQuery
-			if changeScope is "Cancel" then
-				return
-			else if changeScope is "Start and Due" then
+			if promptForChangeScope then
+				set changeScopeQuery to display dialog "Modify start and due dates?" buttons {"Cancel", "Due Only", "Start and Due"} ¬
+					default button 3 with icon caution giving up after 60
+				set changeScope to button returned of changeScopeQuery
+				if changeScope is "Cancel" then return
+			end if
+			if changeScope is "Start and Due" then
 				set modifyStartDate to true
 			else if changeScope is "Due Only" then
 				set modifyStartDate to false
@@ -129,15 +144,27 @@ on defer(selectedItem, daysOffset, modifyStartDate, todayStart)
 	set success to false
 	tell application "OmniFocus"
 		try
+			set realStartDate to start date of selectedItem
+			set {startAncestor, effectiveStartDate} to my getEffectiveStartDate(selectedItem, start date of selectedItem)
+			set realDueDate to due date of selectedItem
+			set {dueAncestor, effectiveDueDate} to my getEffectiveDueDate(selectedItem, due date of selectedItem)
+			
 			if modifyStartDate then
-				set theStartDate to start date of selectedItem
-				if (theStartDate is not missing value) then --There's a preexisting start date
-					set start date of selectedItem to my offsetDateByDays(theStartDate, daysOffset)
+				if (realStartDate is not missing value) then --There's a preexisting start date
+					set start date of selectedItem to my offsetDateByDays(realStartDate, daysOffset)
 				end if
 			end if
-			set theDueDate to due date of selectedItem
-			if (theDueDate is not missing value) then --There's a preexisting due date
-				set due date of selectedItem to my offsetDateByDays(theDueDate, daysOffset)
+			if (realDueDate is not missing value) then --There's a preexisting due date
+				set due date of selectedItem to my offsetDateByDays(realDueDate, daysOffset)
+			end if
+			if realDueDate is not effectiveDueDate then --alert if there's a different effective date
+				--				contents of selectedItem
+				if warnOnDateMismatch then
+					set alertText to "\"" & (name of contents of selectedItem) & ¬
+						"\" has an earlier effective due date inherited from \"" & (name of contents of dueAncestor) & ¬
+						"\". That ancestor item has not been changed."
+					my notifyWithSticky("Error", "Possible Date Mismatch", alertText)
+				end if
 			else if snoozeUnscheduledItems then
 				if start date of selectedItem is missing value then
 					set test to my offsetDateByDays(todayStart, daysOffset)
@@ -150,11 +177,55 @@ on defer(selectedItem, daysOffset, modifyStartDate, todayStart)
 	return success
 end defer
 
+on getEffectiveDueDate(thisItem, effectiveDueDate)
+	tell application "OmniFocus"
+		if due date of thisItem is not missing value then
+			if effectiveDueDate is missing value then
+				set effectiveDueDate to due date of thisItem
+			else if due date of thisItem is less than effectiveDueDate then
+				set effectiveDueDate to due date of thisItem
+			end if
+		end if
+		if parent task of thisItem is missing value then
+			return {thisItem, effectiveDueDate}
+		else
+			return my getEffectiveDueDate(parent task of thisItem, effectiveDueDate)
+		end if
+	end tell
+	return {dueAncestor, effectiveDueDate}
+end getEffectiveDueDate
+
+on getEffectiveStartDate(thisItem, effectiveStartDate)
+	tell application "OmniFocus"
+		if start date of thisItem is not missing value then
+			if effectiveStartDate is missing value then
+				set effectiveStartDate to start date of thisItem
+			else if start date of thisItem is greater than effectiveStartDate then
+				set effectiveStartDate to start date of thisItem
+			end if
+		end if
+		if parent task of thisItem is missing value then
+			return {thisItem, effectiveStartDate}
+		else
+			return my getEffectiveStartDate(parent task of thisItem, effectiveStartDate)
+		end if
+	end tell
+	return {startAncestor, effectiveStartDate}
+end getEffectiveStartDate
+
 on offsetDateByDays(myDate, daysOffset)
 	return myDate + (86400 * daysOffset)
 end offsetDateByDays
 
+on notifyWithSticky(alertName, alertTitle, alertText)
+	my notifyMain(alertName, alertTitle, alertText, true)
+end notifyWithSticky
+
 on notify(alertName, alertTitle, alertText)
+	my notifyMain(alertName, alertTitle, alertText, false)
+end notify
+
+on notifyMain(alertName, alertTitle, alertText, useSticky)
 	if useGrowl then
 		--check to make sure Growl is running
 		tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
@@ -172,7 +243,11 @@ on notify(alertName, alertTitle, alertText)
 			try
 				tell application "GrowlHelperApp"
 					register as application growlAppName all notifications allNotifications default notifications allNotifications icon of application iconApplication
-					notify with name alertName title alertTitle application name growlAppName description alertText
+					if useSticky then
+						notify with name alertName title alertTitle application name growlAppName description alertText with sticky
+					else
+						notify with name alertName title alertTitle application name growlAppName description alertText
+					end if
 				end tell
 			end try
 		else
@@ -184,6 +259,6 @@ p.s. Don't worry—the Growl notification failed but the script was successful."
 	else
 		display dialog alertText with icon 1
 	end if
-end notify
+end notifyMain
 
 main()
