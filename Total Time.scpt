@@ -13,6 +13,10 @@
 
 	# CHANGE HISTORY #
 
+	version 0.2b (2011-07-18)
+	-	Fixed bug where time might not be displayed accurately
+		(Thanks to Ricardo Matias for the bug report)
+
 	version 0.2 (2011-07-07):
 	-	Streamlined calls to OmniFocus with Rob Trew's input (Thanks, Rob!)
 	-	Reorganized script for better readability
@@ -61,7 +65,7 @@ on main()
 				if thisEstimate is not missing value then set totalMinutes to totalMinutes + thisEstimate
 			end repeat
 			set modMinutes to (totalMinutes mod 60)
-			set totalHours to (totalMinutes / 60 as integer)
+			set totalHours to (totalMinutes div 60)
 		end tell
 	end tell
 	
