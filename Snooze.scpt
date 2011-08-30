@@ -14,6 +14,10 @@
 	
 	# CHANGE HISTORY #
 	
+	0.4 (2011-08-30)
+	-	Rewrote notification code to gracefully handle situations where Growl is not installed
+	-	Changed "The item/The items" to "It/They"
+	
 	0.3 (2011-07-07)
 	-	New option to set start time (default: 8am)
 	-	Reorganized; incorporated Rob Trew's method to get items from OmniFocus
@@ -47,13 +51,13 @@
 *)
 
 -- To change settings, modify the following properties
-property showSummaryNotification : false --if true, will display success notifications
-property useGrowl : true --if true, will use Growl for success/failure alerts
+property showSummaryNotification : true --if true, will display success notifications
 property defaultOffset : 1 --number of days to snooze by default
 property defaultStartTime : 8 --default time to use (in hours, 24-hr clock)
 
 -- Don't change these
 property alertItemNum : ""
+property alertItemPronoun : "It"
 property alertDayNum : ""
 property growlAppName : "Dan's Scripts"
 property allNotifications : {"General", "Error"}
@@ -95,8 +99,11 @@ on main()
 		set alertName to "General"
 		set alertTitle to "Script complete"
 		if daysOffset is not 1 then set alertDayNum to "s"
-		if successTot > 1 then set alertItemNum to "s"
-		set alertText to successTot & " item" & alertItemNum & " snoozed. The item" & alertItemNum & " will become available in " & daysOffset & " day" & alertDayNum & "." as string
+		if successTot > 1 then
+			set alertItemPronoun to "They"
+			set alertItemNum to "s"
+		end if
+		set alertText to successTot & " item" & alertItemNum & " snoozed. " & alertItemPronoun & " will become available in " & daysOffset & " day" & alertDayNum & "." as string
 		my notify(alertName, alertTitle, alertText)
 	end if
 end main
@@ -116,36 +123,85 @@ on offsetDateByDays(myDate, daysOffset)
 	return myDate + (86400 * daysOffset)
 end offsetDateByDays
 
+(* Begin notification code *)
 on notify(alertName, alertTitle, alertText)
-	if useGrowl then
-		--check to make sure Growl is running
-		tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
-		if GrowlRunning = 0 then
-			--try to activate Growl
-			try
-				do shell script "/Library/PreferencePanes/Growl.prefPane/Contents/Resources/GrowlHelperApp.app/Contents/MacOS/GrowlHelperApp > /dev/null 2>&1 &"
-				do shell script "~/Library/PreferencePanes/Growl.prefPane/Contents/Resources/GrowlHelperApp.app/Contents/MacOS/GrowlHelperApp > /dev/null 2>&1 &"
-			end try
-			delay 0.2
-			tell application "System Events" to set GrowlRunning to ((application processes whose (name is equal to "GrowlHelperApp")) count)
-		end if
-		--notify
-		if GrowlRunning ≥ 1 then
-			try
-				tell application "GrowlHelperApp"
-					register as application growlAppName all notifications allNotifications default notifications allNotifications icon of application iconApplication
-					notify with name alertName title alertTitle application name growlAppName description alertText
-				end tell
-			end try
-		else
-			set alertText to alertText & " 
- 
-p.s. Don't worry—the Growl notification failed but the script was successful."
-			display dialog alertText with icon 1
-		end if
-	else
-		display dialog alertText with icon 1
-	end if
+	--Call this to show a normal notification
+	my notifyMain(alertName, alertTitle, alertText, false)
 end notify
+
+on notifyWithSticky(alertName, alertTitle, alertText)
+	--Show a sticky Growl notification
+	my notifyMain(alertName, alertTitle, alertText, true)
+end notifyWithSticky
+
+on IsGrowlRunning()
+	tell application "System Events" to set GrowlRunning to (count of (every process where creator type is "GRRR")) > 0
+	return GrowlRunning
+end IsGrowlRunning
+
+on dictToString(dict) --needed to encapsulate dictionaries in osascript
+	set dictString to "{"
+	repeat with i in dict
+		if (length of dictString > 1) then set dictString to dictString & ", "
+		set dictString to dictString & "\"" & i & "\""
+	end repeat
+	set dictString to dictString & "}"
+	return dictString
+end dictToString
+
+on NotifyWithGrowl(alertName, alertTitle, alertText, useSticky)
+	if useSticky then
+		set osascript to "property growlAppName : \"" & growlAppName & "\"
+property allNotifications : " & dictToString(allNotifications) & "
+property enabledNotifications : " & dictToString(enabledNotifications) & "
+property iconApplication : \"" & iconApplication & "\"
+
+tell application \"GrowlHelperApp\"
+	register as application growlAppName all notifications allNotifications default notifications enabledNotifications icon of application iconApplication
+	notify with name \"" & alertName & "\" title \"" & alertTitle & "\" application name growlAppName description \"" & alertText & "\" with sticky
+end tell
+"
+	else
+		set osascript to "property growlAppName : \"" & growlAppName & "\"
+property allNotifications : " & dictToString(allNotifications) & "
+property enabledNotifications : " & dictToString(enabledNotifications) & "
+property iconApplication : \"" & iconApplication & "\"
+
+tell application \"GrowlHelperApp\"
+	register as application growlAppName all notifications allNotifications default notifications enabledNotifications icon of application iconApplication
+	notify with name \"" & alertName & "\" title \"" & alertTitle & "\" application name growlAppName description \"" & alertText & "\"
+end tell
+"
+	end if
+	set shellScript to "osascript -e " & quoted form of osascript & " &> /dev/null &"
+	ignoring application responses
+		do shell script shellScript
+	end ignoring
+end NotifyWithGrowl
+
+on NotifyWithoutGrowl(alertText)
+	tell application "OmniFocus" to display dialog alertText with icon 1 buttons {"OK"} default button "OK"
+end NotifyWithoutGrowl
+
+on notifyMain(alertName, alertTitle, alertText, useSticky)
+	set GrowlRunning to my IsGrowlRunning() --check if Growl is running...
+	if not GrowlRunning then --if Growl isn't running...
+		set GrowlPath to "" --check to see if Growl is installed...
+		try
+			tell application "Finder" to tell (application file id "GRRR") to set strGrowlPath to POSIX path of (its container as alias) & name
+		end try
+		if GrowlPath is not "" then --...try to launch if so...
+			do shell script "open " & strGrowlPath & " > /dev/null 2>&1 &"
+			delay 0.5
+			set GrowlRunning to my IsGrowlRunning()
+		end if
+	end if
+	if GrowlRunning then
+		NotifyWithGrowl(alertName, alertTitle, alertText, useSticky)
+	else
+		NotifyWithoutGrowl(alertText)
+	end if
+end notifyMain
+(* end notification code *)
 
 main()
