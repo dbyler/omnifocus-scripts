@@ -123,7 +123,7 @@ on main()
 		set alertName to "General"
 		set alertTitle to "Script complete"
 		if successTot > 1 then set alertItemNum to "s"
-		set alertText to successTot & " item" & alertItemNum & " now due today." as string
+		set alertText to successTot & " item" & alertItemNum & " now due tomorrow." as string
 		my notify(alertName, alertTitle, alertText)
 	end if
 end main
