@@ -15,6 +15,12 @@
 	
 	# CHANGE HISTORY#
 	
+	0.7 (2011-10-31)
+	-	Now has "Start Only" mode that only modifies start dates. To use, set promptForChangeScope to false
+		and changeScope to "Start Only"
+	-	Updated Growl code to work with Growl 1.3 (App Store version)
+	-	Updated tell syntax to call "first document window", not "front document window"
+	
 	0.6 (2011-08-30)
 	-	Rewrote notification code to gracefully handle situations where Growl is not installed
 	-	Changed default promptForChangeScope to False
@@ -82,7 +88,7 @@ property warnOnDateMismatch : true --if True, warns you if there's a mismatch be
 
 --If you always want to change the same type of information--(Start AND Due dates) OR (Just Due dates)--change promptForChangeScope to false
 property promptForChangeScope : false
-property changeScope : "Start and Due" --options: "Start and Due", "Due Only"
+property changeScope : "Start and Due" --options: "Start and Due", "Due Only", "Start Only"
 
 -- Don't change these
 property alertItemNum : ""
@@ -94,7 +100,7 @@ property iconApplication : "OmniFocus.app"
 
 on main()
 	tell application "OmniFocus"
-		tell content of front document window of front document
+		tell content of first document window of front document
 			--Get selection
 			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
 			set totalItems to count of validSelectedItemsList
@@ -117,8 +123,13 @@ on main()
 			end if
 			if changeScope is "Start and Due" then
 				set modifyStartDate to true
+				set modifyDueDate to true
 			else if changeScope is "Due Only" then
 				set modifyStartDate to false
+				set modifyDueDate to true
+			else if changeScope is "Start Only" then
+				set modifyStartDate to true
+				set modifyDueDate to false
 			end if
 			
 			--Perform action
@@ -126,7 +137,7 @@ on main()
 			set autosave to false
 			set todayStart to (current date) - (get time of (current date)) + (defaultStartTime * 3600)
 			repeat with thisItem in validSelectedItemsList
-				set succeeded to my defer(thisItem, daysOffset, modifyStartDate, todayStart)
+				set succeeded to my defer(thisItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 				if succeeded then set successTot to successTot + 1
 			end repeat
 			set autosave to true
@@ -144,7 +155,7 @@ on main()
 	end if
 end main
 
-on defer(selectedItem, daysOffset, modifyStartDate, todayStart)
+on defer(selectedItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 	set success to false
 	tell application "OmniFocus"
 		try
@@ -166,15 +177,17 @@ on defer(selectedItem, daysOffset, modifyStartDate, todayStart)
 				end if
 			end if
 			if (realDueDate is not missing value) then --There's a preexisting due date
-				set due date of selectedItem to my offsetDateByDays(realDueDate, daysOffset)
-			end if
-			if realDueDate is not effectiveDueDate then --alert if there's a different effective date
-				--				contents of selectedItem
-				if warnOnDateMismatch then
-					set alertText to "«" & (name of contents of selectedItem) & ¬
-						"» has an earlier effective due date inherited from «" & (name of contents of dueAncestor) & ¬
-						"». The latter has not been changed."
-					my notifyWithSticky("Error", "Possible Due Date Mismatch", alertText)
+				if modifyDueDate then
+					set due date of selectedItem to my offsetDateByDays(realDueDate, daysOffset)
+				end if
+				if realDueDate is not effectiveDueDate then --alert if there's a different effective date
+					--				contents of selectedItem
+					if modifyDueDate and warnOnDateMismatch then
+						set alertText to "«" & (name of contents of selectedItem) & ¬
+							"» has an earlier effective due date inherited from «" & (name of contents of dueAncestor) & ¬
+							"». The latter has not been changed."
+						my notifyWithSticky("Error", "Possible Due Date Mismatch", alertText)
+					end if
 				end if
 			else if snoozeUnscheduledItems then
 				if start date of selectedItem is missing value then
@@ -254,34 +267,11 @@ on dictToString(dict) --needed to encapsulate dictionaries in osascript
 	return dictString
 end dictToString
 
-on notifyWithGrowl(alertName, alertTitle, alertText, useSticky)
-	if useSticky then
-		set osascript to "property growlAppName : \"" & growlAppName & "\"
-property allNotifications : " & dictToString(allNotifications) & "
-property enabledNotifications : " & dictToString(enabledNotifications) & "
-property iconApplication : \"" & iconApplication & "\"
-
-tell application \"GrowlHelperApp\"
-	register as application growlAppName all notifications allNotifications default notifications enabledNotifications icon of application iconApplication
-	notify with name \"" & alertName & "\" title \"" & alertTitle & "\" application name growlAppName description \"" & alertText & "\" with sticky
-end tell
-"
-	else
-		set osascript to "property growlAppName : \"" & growlAppName & "\"
-property allNotifications : " & dictToString(allNotifications) & "
-property enabledNotifications : " & dictToString(enabledNotifications) & "
-property iconApplication : \"" & iconApplication & "\"
-
-tell application \"GrowlHelperApp\"
-	register as application growlAppName all notifications allNotifications default notifications enabledNotifications icon of application iconApplication
-	notify with name \"" & alertName & "\" title \"" & alertTitle & "\" application name growlAppName description \"" & alertText & "\"
-end tell
-"
-	end if
-	set shellScript to "osascript -e " & quoted form of osascript & " &> /dev/null &"
-	ignoring application responses
-		do shell script shellScript
-	end ignoring
+on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
+	tell my application growlHelperAppName
+		«event register» given «class appl»:growlAppName, «class anot»:allNotifications, «class dnot»:enabledNotifications, «class iapp»:iconApplication
+		«event notifygr» given «class name»:alertName, «class titl»:alertTitle, «class appl»:growlAppName, «class desc»:alertText
+	end tell
 end notifyWithGrowl
 
 on NotifyWithoutGrowl(alertText)
@@ -302,7 +292,8 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 		end if
 	end if
 	if GrowlRunning then
-		notifyWithGrowl(alertName, alertTitle, alertText, useSticky)
+		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
+		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	else
 		NotifyWithoutGrowl(alertText)
 	end if

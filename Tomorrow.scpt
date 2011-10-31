@@ -31,6 +31,10 @@
 
 	# CHANGE HISTORY #
 
+	0.41 (2011-10-31)
+	-	Updated Growl code to work with Growl 1.3 (App Store version)
+	-	Updated tell syntax to call "first document window", not "front document window"
+
 	0.4 (2011-08-30)
 	-	Rewrote notification code to gracefully handle situations where Growl is not installed
 	
@@ -81,7 +85,7 @@ property iconApplication : "OmniFocus.app"
 
 on main()
 	tell application "OmniFocus"
-		tell content of front document window of front document
+		tell content of first document window of front document
 			--Get selection
 			set totalMinutes to 0
 			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
@@ -198,34 +202,11 @@ on dictToString(dict) --needed to encapsulate dictionaries in osascript
 	return dictString
 end dictToString
 
-on notifyWithGrowl(alertName, alertTitle, alertText, useSticky)
-	if useSticky then
-		set osascript to "property growlAppName : \"" & growlAppName & "\"
-property allNotifications : " & dictToString(allNotifications) & "
-property enabledNotifications : " & dictToString(enabledNotifications) & "
-property iconApplication : \"" & iconApplication & "\"
-
-tell application \"GrowlHelperApp\"
-	register as application growlAppName all notifications allNotifications default notifications enabledNotifications icon of application iconApplication
-	notify with name \"" & alertName & "\" title \"" & alertTitle & "\" application name growlAppName description \"" & alertText & "\" with sticky
-end tell
-"
-	else
-		set osascript to "property growlAppName : \"" & growlAppName & "\"
-property allNotifications : " & dictToString(allNotifications) & "
-property enabledNotifications : " & dictToString(enabledNotifications) & "
-property iconApplication : \"" & iconApplication & "\"
-
-tell application \"GrowlHelperApp\"
-	register as application growlAppName all notifications allNotifications default notifications enabledNotifications icon of application iconApplication
-	notify with name \"" & alertName & "\" title \"" & alertTitle & "\" application name growlAppName description \"" & alertText & "\"
-end tell
-"
-	end if
-	set shellScript to "osascript -e " & quoted form of osascript & " &> /dev/null &"
-	ignoring application responses
-		do shell script shellScript
-	end ignoring
+on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
+	tell my application growlHelperAppName
+		«event register» given «class appl»:growlAppName, «class anot»:allNotifications, «class dnot»:enabledNotifications, «class iapp»:iconApplication
+		«event notifygr» given «class name»:alertName, «class titl»:alertTitle, «class appl»:growlAppName, «class desc»:alertText
+	end tell
 end notifyWithGrowl
 
 on NotifyWithoutGrowl(alertText)
@@ -246,7 +227,8 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 		end if
 	end if
 	if GrowlRunning then
-		notifyWithGrowl(alertName, alertTitle, alertText, useSticky)
+		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
+		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	else
 		NotifyWithoutGrowl(alertText)
 	end if
