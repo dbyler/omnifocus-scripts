@@ -291,7 +291,7 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 			set GrowlRunning to my IsGrowlRunning()
 		end if
 	end if
-	if GrowlRunning then
+	if useGrowl and GrowlRunning then
 		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
 		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	else
