@@ -1,19 +1,23 @@
-﻿(*
+(*
 	# DESCRIPTION #
 	
 	This script takes the currently selected actions or projects and offsets their dates by the
-	user-specified number of days. The user may defer just the due date or both the start and
+	user-specified number of days. The user may shift just the due date or both the start and
 	due dates (useful for skipping weekends for daily recurring tasks).
 	
 	
 	# LICENSE #
 
-	Copyright © 2008-2011 Dan Byler (contact: dbyler@gmail.com)
+	Copyright © 2008-2015 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php)
 	(TL;DR: no warranty, do whatever you want with it.)
 
 	
 	# CHANGE HISTORY#
+	
+	0.8 (2015-04-28)
+	-	Renaming to Shift
+	-	Support passing # of days through LaunchBar and Alfred
 	
 	0.7 (2011-10-31)
 	-	Now has "Start Only" mode that only modifies start dates. To use, set promptForChangeScope to false
@@ -98,7 +102,7 @@ property allNotifications : {"General", "Error"}
 property enabledNotifications : {"General", "Error"}
 property iconApplication : "OmniFocus.app"
 
-on main()
+on main(q)
 	tell application "OmniFocus"
 		tell content of first document window of front document
 			--Get selection
@@ -113,8 +117,27 @@ on main()
 			end if
 			
 			--User options
-			display dialog "Defer for how many days (from existing)?" default answer defaultOffset buttons {"Cancel", "OK"} default button 2
-			set daysOffset to (the text returned of the result) as integer
+			set res to q
+			if res is missing value then
+				display dialog "Defer for how many days (from existing)?" default answer defaultOffset buttons {"Cancel", "OK"} default button 2
+				set res to (the text returned of the result)
+			end if
+			try
+				set daysOffset to res as integer
+				if daysOffset as real is not res as real then
+					set daysOffset to res as real
+				end if
+			on error
+				try
+					set daysOffset to (run script res) as real
+				on error
+					set alertName to "Error"
+					set alertTitle to "Script failure"
+					set alertText to "Error interpreting your input. Please try an integer or fraction."
+					my notify(alertName, alertTitle, alertText)
+					return
+				end try
+			end try
 			if promptForChangeScope then
 				set changeScopeQuery to display dialog "Modify start and due dates?" buttons {"Cancel", "Due Only", "Start and Due"} ¬
 					default button 3 with icon caution giving up after 60
@@ -159,13 +182,13 @@ on defer(selectedItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 	set success to false
 	tell application "OmniFocus"
 		try
-			set realStartDate to start date of selectedItem
-			set {startAncestor, effectiveStartDate} to my getEffectiveStartDate(selectedItem, start date of selectedItem)
+			set realStartDate to defer date of selectedItem
+			set {startAncestor, effectiveStartDate} to my getEffectiveStartDate(selectedItem, defer date of selectedItem)
 			set realDueDate to due date of selectedItem
 			set {dueAncestor, effectiveDueDate} to my getEffectiveDueDate(selectedItem, due date of selectedItem)
 			if modifyStartDate then
 				if (realStartDate is not missing value) then --There's a preexisting start date
-					set start date of selectedItem to my offsetDateByDays(realStartDate, daysOffset)
+					set defer date of selectedItem to my offsetDateByDays(realStartDate, daysOffset)
 					if warnOnDateMismatch then
 						if realStartDate is not effectiveStartDate then
 							set alertText to "«" & (name of contents of selectedItem) & ¬
@@ -190,9 +213,9 @@ on defer(selectedItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 					end if
 				end if
 			else if snoozeUnscheduledItems then
-				if start date of selectedItem is missing value then
+				if defer date of selectedItem is missing value then
 					set test to my offsetDateByDays(todayStart, daysOffset)
-					set start date of selectedItem to my offsetDateByDays(todayStart, daysOffset)
+					set defer date of selectedItem to my offsetDateByDays(todayStart, daysOffset)
 				end if
 			end if
 			set success to true
@@ -221,11 +244,11 @@ end getEffectiveDueDate
 
 on getEffectiveStartDate(thisItem, effectiveStartDate)
 	tell application "OmniFocus"
-		if start date of thisItem is not missing value then
+		if defer date of thisItem is not missing value then
 			if effectiveStartDate is missing value then
-				set effectiveStartDate to start date of thisItem
-			else if start date of thisItem is greater than effectiveStartDate then
-				set effectiveStartDate to start date of thisItem
+				set effectiveStartDate to defer date of thisItem
+			else if defer date of thisItem is greater than effectiveStartDate then
+				set effectiveStartDate to defer date of thisItem
 			end if
 		end if
 		if parent task of thisItem is missing value then
@@ -240,6 +263,7 @@ end getEffectiveStartDate
 on offsetDateByDays(myDate, daysOffset)
 	return myDate + (86400 * daysOffset)
 end offsetDateByDays
+
 
 (* Begin notification code *)
 on notify(alertName, alertTitle, alertText)
@@ -291,7 +315,7 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 			set GrowlRunning to my IsGrowlRunning()
 		end if
 	end if
-	if useGrowl and GrowlRunning then
+	if GrowlRunning then
 		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
 		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	else
@@ -300,4 +324,12 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 end notifyMain
 (* end notification code *)
 
-main()
+main(missing value)
+
+on alfred_script(q)
+	main(q)
+end alfred_script
+
+on handle_string(q)
+	main(q)
+end handle_string
