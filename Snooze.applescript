@@ -1,18 +1,24 @@
-﻿(*
+(*
 	# DESCRIPTION #
 	
-	This script "snoozes" the currently selected actions or projects by setting the start date to 
-	given number of days in the future.
+	This script "snoozes" the currently selected actions or projects by setting the start date to the
+	given number of days in the future. Snoozes from current time if a fraction/decimal is given.
 	
 	
 	# LICENSE #
 	
-	Copyright © 2010 Dan Byler (contact: dbyler@gmail.com)
+	Copyright © 2010-2015 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php)
 	(TL;DR: no warranty, do whatever you want with it.)
 	
 	
 	# CHANGE HISTORY #
+	
+	0.5 (2015-05-07)
+	-	Support passing # of days through LaunchBar and Alfred (unsupported)
+	-	Support snoozing for a fraction of a day. You can use decimals (.01 days is about 15 minutes)
+		or fractions (1/24 = 1 hour)	
+	-	Shout out to Bill Palmer for an elegant way to snooze without counting seconds in a day
 	
 	0.41 (2011-10-31)
 	-	Updated Growl code to work with Growl 1.3 (App Store version)
@@ -57,7 +63,7 @@
 -- To change settings, modify the following properties
 property showSummaryNotification : true --if true, will display success notifications
 property defaultOffset : 1 --number of days to snooze by default
-property defaultStartTime : 8 --default time to use (in hours, 24-hr clock)
+property defaultStartTime : 6 --default time to use (in hours, 24-hr clock)
 
 -- Don't change these
 property alertItemNum : ""
@@ -68,7 +74,7 @@ property allNotifications : {"General", "Error"}
 property enabledNotifications : {"General", "Error"}
 property iconApplication : "OmniFocus.app"
 
-on main()
+on main(q)
 	tell application "OmniFocus"
 		tell content of first document window of front document
 			--Get selection
@@ -83,22 +89,46 @@ on main()
 			end if
 			
 			--User options
-			display dialog "Snooze for how many days (from today)?" default answer defaultOffset buttons {"Cancel", "OK"} default button 2
-			set daysOffset to (the text returned of the result) as integer
+			set res to q
+			if res is missing value then
+				display dialog "Snooze for how many days (from today)?" default answer defaultOffset buttons {"Cancel", "OK"} default button 2
+				set res to (the text returned of the result)
+			end if
+			try
+				set daysOffset to res as integer
+				if daysOffset as real is not res as real then
+					set daysOffset to res as real
+				end if
+			on error
+				try
+					set daysOffset to (run script res) as real
+				on error
+					set alertName to "Error"
+					set alertTitle to "Error"
+					set alertText to "Error interpreting your input. Please try an integer or fraction"
+					my notify(alertName, alertTitle, alertText)
+					return
+				end try
+			end try
 			
 			--Perform action
-			set todayStart to (current date) - (get time of (current date)) + (defaultStartTime * 3600)
 			set successTot to 0
 			set autosave to false
 			repeat with thisItem in validSelectedItemsList
-				set succeeded to my snooze(thisItem, todayStart, daysOffset)
+				set succeeded to my snooze(thisItem, daysOffset)
 				if succeeded then set successTot to successTot + 1
 			end repeat
 			set autosave to true
 		end tell
 	end tell
 	
-	--Display summary notification
+	--Error notification
+	if successTot = 0 then
+		my notify("Error", "Error", "No items snoozed")
+		return
+	end if
+	
+	--Summary notification
 	if showSummaryNotification then
 		set alertName to "General"
 		set alertTitle to "Script complete"
@@ -112,20 +142,28 @@ on main()
 	end if
 end main
 
-on snooze(selectedItem, todayStart, daysOffset)
+on snooze(selectedItem, snoozeLength)
 	set success to false
 	tell application "OmniFocus"
 		try
-			set start date of selectedItem to my offsetDateByDays(todayStart, daysOffset)
+			set todayMidnight to (current date) - (time of (current date))
+			
+			if snoozeLength > 0 and snoozeLength < 1.0 then --fractional snooze time
+				set defer date of selectedItem to (current date) + (days * snoozeLength)
+			else --standard snooze time
+				if defer date of selectedItem is not missing value then
+					set existingDeferDate to defer date of selectedItem
+					set defer date of selectedItem to todayMidnight + (time of existingDeferDate) + (snoozeLength * days)
+				else
+					set defer date of selectedItem to todayMidnight + (defaultStartTime * hours) + (snoozeLength * days)
+				end if
+			end if
 			set success to true
 		end try
 	end tell
 	return success
 end snooze
 
-on offsetDateByDays(myDate, daysOffset)
-	return myDate + (86400 * daysOffset)
-end offsetDateByDays
 
 (* Begin notification code *)
 on notify(alertName, alertTitle, alertText)
@@ -185,4 +223,13 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 	end if
 end notifyMain
 (* end notification code *)
-main()
+
+main(missing value)
+
+on alfred_script(q)
+	main(q)
+end alfred_script
+
+on handle_string(q)
+	main(q)
+end handle_string
