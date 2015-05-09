@@ -83,11 +83,11 @@
 *)
 
 -- To change settings, modify the following properties
-property snoozeUnscheduledItems : true --if True, when deferring Start AND Due dates, will set start date to given # of days in the future
+property snoozeUnscheduledItems : false --if True, when deferring Start AND Due dates, will set start date to given # of days in the future
 property showSummaryNotification : true --if true, will display success notifications
 property useGrowl : true --if true, will use Growl for success/failure alerts
 property defaultOffset : 1 --number of days to defer by default
-property defaultStartTime : 8 --default time to use (in hours, 24-hr clock)
+property defaultStartTime : 6 --default time to use (in hours, 24-hr clock)
 property warnOnDateMismatch : true --if True, warns you if there's a mismatch between a deferred item's actual and effective Due date. An effective due date is set by a parent task or project.
 
 --If you always want to change the same type of information--(Start AND Due dates) OR (Just Due dates)--change promptForChangeScope to false
@@ -189,6 +189,7 @@ on defer(selectedItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 			if modifyStartDate then
 				if (realStartDate is not missing value) then --There's a preexisting start date
 					set defer date of selectedItem to my offsetDateByDays(realStartDate, daysOffset)
+					set success to true
 					if warnOnDateMismatch then
 						if realStartDate is not effectiveStartDate then
 							set alertText to "«" & (name of contents of selectedItem) & ¬
@@ -202,6 +203,7 @@ on defer(selectedItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 			if (realDueDate is not missing value) then --There's a preexisting due date
 				if modifyDueDate then
 					set due date of selectedItem to my offsetDateByDays(realDueDate, daysOffset)
+					set success to true
 				end if
 				if realDueDate is not effectiveDueDate then --alert if there's a different effective date
 					--				contents of selectedItem
@@ -214,11 +216,10 @@ on defer(selectedItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 				end if
 			else if snoozeUnscheduledItems then
 				if defer date of selectedItem is missing value then
-					set test to my offsetDateByDays(todayStart, daysOffset)
 					set defer date of selectedItem to my offsetDateByDays(todayStart, daysOffset)
+					set success to true
 				end if
 			end if
-			set success to true
 		end try
 	end tell
 	return success
