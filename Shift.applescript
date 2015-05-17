@@ -15,6 +15,9 @@
 	
 	# CHANGE HISTORY#
 	
+	0.8.1 (2015-05-17)
+	-	Use Notification Center instead of an alert when not running Growl. Requires Mountain Lion or newer
+
 	0.8 (2015-04-28)
 	-	Renaming to Shift
 	-	Support passing # of days through LaunchBar and Alfred
@@ -282,16 +285,6 @@ on IsGrowlRunning()
 	return GrowlRunning
 end IsGrowlRunning
 
-on dictToString(dict) --needed to encapsulate dictionaries in osascript
-	set dictString to "{"
-	repeat with i in dict
-		if (length of dictString > 1) then set dictString to dictString & ", "
-		set dictString to dictString & "\"" & i & "\""
-	end repeat
-	set dictString to dictString & "}"
-	return dictString
-end dictToString
-
 on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	tell my application growlHelperAppName
 		«event register» given «class appl»:growlAppName, «class anot»:allNotifications, «class dnot»:enabledNotifications, «class iapp»:iconApplication
@@ -300,7 +293,7 @@ on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useStic
 end notifyWithGrowl
 
 on NotifyWithoutGrowl(alertText)
-	tell application "OmniFocus" to display dialog alertText with icon 1 buttons {"OK"} default button "OK"
+	display notification alertText
 end NotifyWithoutGrowl
 
 on notifyMain(alertName, alertTitle, alertText, useSticky)
@@ -324,6 +317,7 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 	end if
 end notifyMain
 (* end notification code *)
+
 
 main(missing value)
 

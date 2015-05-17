@@ -14,13 +14,16 @@
 	
 	# CHANGE HISTORY #
 	
+	0.5.1 (2015-05-17)
+	-	Use Notification Center instead of an alert when not running Growl. Requires Mountain Lion or newer
+	
 	0.5 (2015-05-07)
 	-	Support passing # of days through LaunchBar and Alfred (unsupported)
 	-	Support snoozing for a fraction of a day. You can use decimals (.01 days is about 15 minutes)
 		or fractions (1/24 = 1 hour)	
 	-	Shout out to Bill Palmer for an elegant way to snooze without counting seconds in a day
 	
-	0.41 (2011-10-31)
+	0.4.1 (2011-10-31)
 	-	Updated Growl code to work with Growl 1.3 (App Store version)
 	-	Updated tell syntax to call "first document window", not "front document window"
 	
@@ -34,10 +37,10 @@
 	-	No longer fails when a Grouping divider is selected
 	-	Fixes potential issue when launching from OmniFocus toolbar
 	
-	0.2c (2010-06-22)
+	0.2.2 (2010-06-22)
 	-	Actual fix for autosave
 	
-	0.2b (2010-06-21)
+	0.2.1 (2010-06-21)
 	-	Encapsulated autosave in "try" statements in case this fails
 	
 	0.2 (2010-06-15)
@@ -181,16 +184,6 @@ on IsGrowlRunning()
 	return GrowlRunning
 end IsGrowlRunning
 
-on dictToString(dict) --needed to encapsulate dictionaries in osascript
-	set dictString to "{"
-	repeat with i in dict
-		if (length of dictString > 1) then set dictString to dictString & ", "
-		set dictString to dictString & "\"" & i & "\""
-	end repeat
-	set dictString to dictString & "}"
-	return dictString
-end dictToString
-
 on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	tell my application growlHelperAppName
 		«event register» given «class appl»:growlAppName, «class anot»:allNotifications, «class dnot»:enabledNotifications, «class iapp»:iconApplication
@@ -199,7 +192,7 @@ on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useStic
 end notifyWithGrowl
 
 on NotifyWithoutGrowl(alertText)
-	tell application "OmniFocus" to display dialog alertText with icon 1 buttons {"OK"} default button "OK"
+	display notification alertText
 end NotifyWithoutGrowl
 
 on notifyMain(alertName, alertTitle, alertText, useSticky)
@@ -223,6 +216,7 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 	end if
 end notifyMain
 (* end notification code *)
+
 
 main(missing value)
 

@@ -1,4 +1,4 @@
-﻿(*
+(*
 	# DESCRIPTION #
 
 	This script takes the currently selected actions or projects and sets them for action tomorrow.
@@ -30,6 +30,9 @@
 	
 
 	# CHANGE HISTORY #
+
+	0.42 (2015-05-17)
+	-	Use Notification Center instead of an alert when not running Growl. Requires Mountain Lion or newer
 
 	0.41 (2011-10-31)
 	-	Updated Growl code to work with Growl 1.3 (App Store version)
@@ -136,13 +139,13 @@ on startTomorrow(selectedItem, newDate)
 	set success to false
 	tell application "OmniFocus"
 		try
-			set originalStartDateTime to start date of selectedItem
+			set originalStartDateTime to defer date of selectedItem
 			if (originalStartDateTime is not missing value) then
 				--Set new start date with original start time
-				set start date of selectedItem to (newDate + (time of originalStartDateTime))
+				set defer date of selectedItem to (newDate + (time of originalStartDateTime))
 				set success to true
 			else
-				set start date of selectedItem to (newDate + (startTime * hours))
+				set defer date of selectedItem to (newDate + (startTime * hours))
 				set success to true
 			end if
 		end try
@@ -161,10 +164,10 @@ on dueTomorrow(selectedItem, newDate)
 				set theDelta to (newDate - originalDueStartDate) / 86400
 				set newDueDateTime to (originalDueDateTime + (theDelta * days))
 				set due date of selectedItem to newDueDateTime
-				set originalStartDateTime to start date of selectedItem
+				set originalStartDateTime to defer date of selectedItem
 				if (originalStartDateTime is not missing value) then
 					set newStartDateTime to (originalStartDateTime + (theDelta * days))
-					set start date of selectedItem to newStartDateTime
+					set defer date of selectedItem to newStartDateTime
 				end if
 				set success to true
 			else
@@ -192,16 +195,6 @@ on IsGrowlRunning()
 	return GrowlRunning
 end IsGrowlRunning
 
-on dictToString(dict) --needed to encapsulate dictionaries in osascript
-	set dictString to "{"
-	repeat with i in dict
-		if (length of dictString > 1) then set dictString to dictString & ", "
-		set dictString to dictString & "\"" & i & "\""
-	end repeat
-	set dictString to dictString & "}"
-	return dictString
-end dictToString
-
 on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	tell my application growlHelperAppName
 		«event register» given «class appl»:growlAppName, «class anot»:allNotifications, «class dnot»:enabledNotifications, «class iapp»:iconApplication
@@ -210,7 +203,7 @@ on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useStic
 end notifyWithGrowl
 
 on NotifyWithoutGrowl(alertText)
-	tell application "OmniFocus" to display dialog alertText with icon 1 buttons {"OK"} default button "OK"
+	display notification alertText
 end NotifyWithoutGrowl
 
 on notifyMain(alertName, alertTitle, alertText, useSticky)
