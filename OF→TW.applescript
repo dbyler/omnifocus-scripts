@@ -17,8 +17,25 @@
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php)
 	(TL;DR: no warranty, do whatever you want with it.)
 	
-	
+	*)
+
+-- To change settings, modify the following properties:
+
+property mailClient : "Postbox" --options: Mail, Postbox, or Other
+property fromAddress : "" --only works with Mail.app
+property subjectSuffix : " !!!" --appended to the email subject
+property bodySuffix : "
+
+#End"
+
+(*
 	# CHANGE HISTORY #
+	
+	2.3.1 (2015-07-19)
+		- Processes each email separately
+		- Task note used for email body
+		- Updates to date processing
+		- Email subject suffix is 
 	
 	2.3 (2015-06-30)
 		- Context is hidden from subject if not set in OmniFocus
@@ -32,6 +49,7 @@
 		- Fixed @@ bug
 		- Brings mail application to front after running
 		- Changed behavior of "grouped" tasks. Now an email will contain multiple tasks only if they share a project AND context.
+		
 	2.1 (2014-11-04)
 		- Fixes issue when running from OmniFocus toolbar
 		- Works with Inbox items (prompts for project if there is none)
@@ -52,10 +70,6 @@
 		
 *)
 
--- To change settings, modify the following properties
-property fromAddress : "mitra <angelkyodo@transformativechange.org>"
-property useMail : false --set to "true" to use Apple Mail. Set to "false" otherwise
-property usePostbox : true --set to "true" to use Postbox. Set to "false" otherwise (will use the system default email client if both are false)
 
 on main()
 	set email_list to {}
@@ -71,53 +85,32 @@ on main()
 			end if
 			
 			repeat with thisItem in validSelectedItemsList
+				-- Email subject
 				set theTitle to name of thisItem
-				set theNote to (note of contents of thisItem)
+				try
+					set theSubject to theTitle & " @" & (name of context of thisItem)
+				on error
+					set theSubject to theTitle
+				end try
+				try
+					set theDate to due date of thisItem
+					set theDueDateString to (my pyFormatTime(theDate, "[%m/%d/%Y]"))
+					set theSubject to theSubject & " " & theDueDateString & subjectSuffix
+				on error
+					set theSubject to theSubject & subjectSuffix
+				end try
+				
+				-- Email recipient
 				try
 					set theParentName to (my replace_chars(" ", "", (name of containing project of thisItem)))
 				on error
 					display dialog theTitle & " has no containing project. Please enter a project name:" default answer "akw"
 					set theParentName to text returned of result
 				end try
-				try
-					set theContext to ("@" & name of context of thisItem)
-				on error
-					set theContext to ""
-				end try
+				set theRecipient to theParentName & "@tasks.teamwork.com"
 				
-				try
-					set theDate to due date of thisItem
-					set theDueDateString to (my pyFormatTime(theDate))
-				on error
-					set theDueDateString to ""
-				end try
-				
-				set newRecord to {eContext:theContext, eNote:theNote, eBody:theTitle, eDue:theDueDateString, eProject:theParentName}
-				
-				if length of email_list is 0 then
-					set end of email_list to newRecord
-				else
-					set added to false
-					repeat with email in email_list
-						if eContext of newRecord is eContext of email and eProject of newRecord is eProject of email then
-							set eBody of email to (eBody of email) & "
-" & eBody of newRecord
-							set added to true
-						end if
-						if not added then
-							set end of email_list to newRecord
-						end if
-					end repeat
-				end if
-			end repeat
-			
-			repeat with email in email_list
-				set theSubject to eBody of email & " " & eContext of email & " " & eDue of email & " !!!"
-				set theRecipient to eProject of email & "@tasks.teamwork.com"
-				set theBody to eBody of email & "
-
-
-#End"
+				-- Email body
+				set theBody to (note of contents of thisItem) & bodySuffix
 				my sendMessage(theRecipient, theSubject, theBody)
 			end repeat
 		end tell
@@ -125,7 +118,7 @@ on main()
 end main
 
 on sendMessage(emailRecipient, emailSubject, emailBody)
-	if useMail then
+	if mailClient = "Mail" then
 		tell application "Mail"
 			activate
 			set theOutMessage to make new outgoing message with properties {visible:true}
@@ -136,7 +129,7 @@ on sendMessage(emailRecipient, emailSubject, emailBody)
 				set content to emailBody
 			end tell
 		end tell
-	else if usePostbox then
+	else if mailClient = "Postbox" then
 		tell application "Postbox"
 			activate
 			send message subject emailSubject body emailBody recipient emailRecipient
@@ -148,10 +141,11 @@ on sendMessage(emailRecipient, emailSubject, emailBody)
 	end if
 end sendMessage
 
-on pyFormatTime(AS_Date)
-	set timeFormat to quoted form of "[%m/%d/%Y]"
+on pyFormatTime(AS_Date, AS_Format)
+	set timeFormat to quoted form of AS_Format
 	return (do shell script "/usr/bin/python -c \"import time, dateutil.parser; print dateutil.parser.parse('" & AS_Date & "').strftime(" & timeFormat & "); \"")
 end pyFormatTime
+
 
 on replace_chars(search_string, replacement_string, this_text)
 	set AppleScript's text item delimiters to the search_string
