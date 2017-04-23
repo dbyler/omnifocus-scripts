@@ -28,12 +28,16 @@
 	
 	# LICENSE #
 	
-	Copyright Â© 2011 Dan Byler (contact: dbyler@gmail.com)
+	Copyright © 2011-2017 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php) 
 	(TL;DR: do whatever you want with it.)
 	
 
 	# CHANGE HISTORY #
+
+	2017-04-22
+	-	Fixes an issue when running with certain top-level category separators selected
+	-	Minor update to notification code
 
 	0.42 (2015-05-17)
 	-	Use Notification Center instead of an alert when not running Growl. Requires Mountain Lion or newer
@@ -97,7 +101,7 @@ on main()
 		tell content of first document window of front document
 			--Get selection
 			set totalMinutes to 0
-			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not context and class of its value is not perspective)
 			set totalItems to count of validSelectedItemsList
 			if totalItems is 0 then
 				set alertName to "Error"
@@ -203,13 +207,13 @@ end IsGrowlRunning
 
 on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	tell my application growlHelperAppName
-		Â«event registerÂ» given Â«class applÂ»:growlAppName, Â«class anotÂ»:allNotifications, Â«class dnotÂ»:enabledNotifications, Â«class iappÂ»:iconApplication
-		Â«event notifygrÂ» given Â«class nameÂ»:alertName, Â«class titlÂ»:alertTitle, Â«class applÂ»:growlAppName, Â«class descÂ»:alertText
+		Çevent registerÈ given Çclass applÈ:growlAppName, Çclass anotÈ:allNotifications, Çclass dnotÈ:enabledNotifications, Çclass iappÈ:iconApplication
+		Çevent notifygrÈ given Çclass nameÈ:alertName, Çclass titlÈ:alertTitle, Çclass applÈ:growlAppName, Çclass descÈ:alertText
 	end tell
 end notifyWithGrowl
 
-on NotifyWithoutGrowl(alertText)
-	display notification alertText
+on NotifyWithoutGrowl(alertText, alertTitle)
+	display notification alertText with title alertTitle
 end NotifyWithoutGrowl
 
 on notifyMain(alertName, alertTitle, alertText, useSticky)
@@ -229,7 +233,7 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
 		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	else
-		NotifyWithoutGrowl(alertText)
+		NotifyWithoutGrowl(alertText, alertTitle)
 	end if
 end notifyMain
 (* end notification code *)

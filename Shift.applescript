@@ -1,20 +1,32 @@
 (*
 	# DESCRIPTION #
 	
-	This script takes the currently selected actions or projects and offsets their dates by the
-	user-specified number of days. The user may shift just the due date or both the start and
-	due dates (useful for skipping weekends for daily recurring tasks).
+	Offsets date of selected items by the number of days specified when you run the script.
+	
+	Depending on the script settings (see below), this will shift
+	
+	a) just the due date or
+	b) both the start and due dates (useful for skipping weekends for daily recurring tasks)
 	
 	
 	# LICENSE #
 
-	Copyright Â© 2008-2015 Dan Byler (contact: dbyler@gmail.com)
+	Copyright © 2008-2017 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php)
 	(TL;DR: no warranty, do whatever you want with it.)
-
 	
+
+	# KNOWN ISSUES #
+	-	When the script is invoked from the OmniFocus toolbar and canceled, OmniFocus displays an alert.
+		This does not occur when invoked from another launcher (script menu, FastScripts LaunchBar, etc).
+
+
 	# CHANGE HISTORY#
 	
+	2017-04-22
+	-	Fixes an issue when running with certain top-level category separators selected
+	-	Minor update to notification code
+
 	0.8.1 (2015-05-17)
 	-	Use Notification Center instead of an alert when not running Growl. Requires Mountain Lion or newer
 
@@ -72,17 +84,6 @@
 		
 	0.1: Original release
 
-
-	# INSTALLATION #
-
-	-	Copy to ~/Library/Scripts/Applications/Omnifocus
- 	-	If desired, add to the OmniFocus toolbar using View > Customize Toolbar... within OmniFocus
-
-
-	# KNOWN ISSUES #
-	-	When the script is invoked from the OmniFocus toolbar and canceled, OmniFocus displays an alert.
-		This does not occur when invoked from another launcher (script menu, FastScripts LaunchBar, etc).
-
 *)
 
 -- To change settings, modify the following properties
@@ -109,7 +110,7 @@ on main(q)
 	tell application "OmniFocus"
 		tell content of first document window of front document
 			--Get selection
-			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not context and class of its value is not perspective)
 			set totalItems to count of validSelectedItemsList
 			if totalItems is 0 then
 				set alertName to "Error"
@@ -142,7 +143,7 @@ on main(q)
 				end try
 			end try
 			if promptForChangeScope then
-				set changeScopeQuery to display dialog "Modify start and due dates?" buttons {"Cancel", "Due Only", "Start and Due"} Â¬
+				set changeScopeQuery to display dialog "Modify start and due dates?" buttons {"Cancel", "Due Only", "Start and Due"} Â
 					default button 3 with icon caution giving up after 60
 				set changeScope to button returned of changeScopeQuery
 				if changeScope is "Cancel" then return
@@ -195,9 +196,9 @@ on defer(selectedItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 					set success to true
 					if warnOnDateMismatch then
 						if realStartDate is not effectiveStartDate then
-							set alertText to "Â«" & (name of contents of selectedItem) & Â¬
-								"Â» has a later effective start date inherited from Â«" & (name of contents of dueAncestor) & Â¬
-								"Â». The latter has not been changed."
+							set alertText to "Ç" & (name of contents of selectedItem) & Â
+								"È has a later effective start date inherited from Ç" & (name of contents of dueAncestor) & Â
+								"È. The latter has not been changed."
 							my notifyWithSticky("Error", "Possible Start Date Mismatch", alertText)
 						end if
 					end if
@@ -211,9 +212,9 @@ on defer(selectedItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 				if realDueDate is not effectiveDueDate then --alert if there's a different effective date
 					--				contents of selectedItem
 					if modifyDueDate and warnOnDateMismatch then
-						set alertText to "Â«" & (name of contents of selectedItem) & Â¬
-							"Â» has an earlier effective due date inherited from Â«" & (name of contents of dueAncestor) & Â¬
-							"Â». The latter has not been changed."
+						set alertText to "Ç" & (name of contents of selectedItem) & Â
+							"È has an earlier effective due date inherited from Ç" & (name of contents of dueAncestor) & Â
+							"È. The latter has not been changed."
 						my notifyWithSticky("Error", "Possible Due Date Mismatch", alertText)
 					end if
 				end if
@@ -287,13 +288,13 @@ end IsGrowlRunning
 
 on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	tell my application growlHelperAppName
-		Â«event registerÂ» given Â«class applÂ»:growlAppName, Â«class anotÂ»:allNotifications, Â«class dnotÂ»:enabledNotifications, Â«class iappÂ»:iconApplication
-		Â«event notifygrÂ» given Â«class nameÂ»:alertName, Â«class titlÂ»:alertTitle, Â«class applÂ»:growlAppName, Â«class descÂ»:alertText
+		Çevent registerÈ given Çclass applÈ:growlAppName, Çclass anotÈ:allNotifications, Çclass dnotÈ:enabledNotifications, Çclass iappÈ:iconApplication
+		Çevent notifygrÈ given Çclass nameÈ:alertName, Çclass titlÈ:alertTitle, Çclass applÈ:growlAppName, Çclass descÈ:alertText
 	end tell
 end notifyWithGrowl
 
-on NotifyWithoutGrowl(alertText)
-	display notification alertText
+on NotifyWithoutGrowl(alertText, alertTitle)
+	display notification alertText with title alertTitle
 end NotifyWithoutGrowl
 
 on notifyMain(alertName, alertTitle, alertText, useSticky)
@@ -313,7 +314,7 @@ on notifyMain(alertName, alertTitle, alertText, useSticky)
 		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
 		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	else
-		NotifyWithoutGrowl(alertText)
+		NotifyWithoutGrowl(alertText, alertTitle)
 	end if
 end notifyMain
 (* end notification code *)

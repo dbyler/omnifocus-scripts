@@ -1,26 +1,24 @@
 (*
 	# DESCRIPTION #
 	
-	Inspired by OmniFocus 1 behavior, this script opens the selected task's (or tasks')
-	project(s) in a new window so you can jump from a context view into the project view
-	without losing place.
+	Opens the selected task's project in a new window so you can jump from a context
+	perspective view into the project without losing place.
+	
+	(Also works with multiple items selected)
 	
 	# LICENSE #
 	
-	Copyright Â© 2015 Dan Byler (contact: dbyler@gmail.com)
+	Copyright © 2015-2017 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php)
 	(TL;DR: no warranty, do whatever you want with it.)
 	
 	# CHANGE HISTORY #
 	
-	1.0 (2015-04-28)
+	2017-04-23
+	-	Fixes an issue when running with certain top-level category separators selected
+
+	2015-04-28
 	-	Initial release
-
-	# INSTALLATION #
-
-	1. Copy script to OmniFocus script folder (OmniFocus -> Help -> Open Scripts Folder)
-	2. (Optional) Update to use the icon in this repo
-	3. Add script to the OmniFocus toolbar using View -> Customize Toolbar...
 		
 *)
 
@@ -30,7 +28,7 @@ on main()
 		set myFocus to {}
 		-- get selection
 		tell content of front document window of front document
-			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder)
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not context and class of its value is not perspective)
 			set totalItems to count of validSelectedItemsList
 			if totalItems is 0 then
 				my notifyWithoutGrowl("No valid task(s) selected")
@@ -65,7 +63,9 @@ on main()
 end main
 
 on notifyWithoutGrowl(alertText)
-	tell application "OmniFocus" to display dialog alertText with icon 1 buttons {"OK"} default button "OK"
+	try
+		display notification alertText with title "OmniFocus Script Complete"
+	end try
 end notifyWithoutGrowl
 
 main()
