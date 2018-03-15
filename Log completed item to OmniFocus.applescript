@@ -11,6 +11,9 @@
 
 	# CHANGE HISTORY #
 
+  2018-03-15
+  - Updated for compatibility with a breaking change in OmniFocus' AppleScript Dictionary
+
 	2015-05-19
 	-	Initial version
 
@@ -44,7 +47,8 @@ on log_item(myTask)
 			set myContext to (get first context whose name is myContextName)
 			
 			tell myProject
-				make task with properties {name:myTask, context:myContext, completion date:(current date)}
+				set myTask to make task with properties {name:myTaskName, context:myContext}
+				mark complete myTask
 			end tell
 			
 			display notification "\"" & myTask & "\"" & " logged to " & name of myProject
