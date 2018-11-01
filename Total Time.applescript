@@ -13,6 +13,9 @@
 
 	# CHANGE HISTORY #
 
+	2018-11-01
+	-	Fix for OmniFocus 3 ("Contexts" replaced with "Tags")
+
 	2017-04-23
 	-	Fixes an issue when running with certain top-level category separators selected
 	-	Minor update to notification code
