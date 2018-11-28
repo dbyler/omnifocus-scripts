@@ -14,6 +14,9 @@
 	
 	# CHANGE HISTORY #
 	
+	2018-11-28
+	-	Updated to work with OmniFocus 3
+
 	2017-04-23
 	-	Fixes an issue when running with certain top-level category separators selected
 
@@ -28,7 +31,7 @@ on main()
 		set myFocus to {}
 		-- get selection
 		tell content of front document window of front document
-			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not context and class of its value is not perspective)
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not tag and class of its value is not perspective)
 			set totalItems to count of validSelectedItemsList
 			if totalItems is 0 then
 				my notifyWithoutGrowl("No valid task(s) selected")
