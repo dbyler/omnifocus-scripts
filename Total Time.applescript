@@ -6,7 +6,7 @@
 
 	# LICENSE #
 	
-	Copyright © 2011-2017 Dan Byler (contact: dbyler@gmail.com)
+	Copyright Â© 2011-2017 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php) 
 	(TL;DR: do whatever you want with it.)
 
@@ -113,8 +113,8 @@ end IsGrowlRunning
 
 on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
 	tell my application growlHelperAppName
-		Çevent registerÈ given Çclass applÈ:growlAppName, Çclass anotÈ:allNotifications, Çclass dnotÈ:enabledNotifications, Çclass iappÈ:iconApplication
-		Çevent notifygrÈ given Çclass nameÈ:alertName, Çclass titlÈ:alertTitle, Çclass applÈ:growlAppName, Çclass descÈ:alertText
+		Â«event registerÂ» given Â«class applÂ»:growlAppName, Â«class anotÂ»:allNotifications, Â«class dnotÂ»:enabledNotifications, Â«class iappÂ»:iconApplication
+		Â«event notifygrÂ» given Â«class nameÂ»:alertName, Â«class titlÂ»:alertTitle, Â«class applÂ»:growlAppName, Â«class descÂ»:alertText
 	end tell
 end notifyWithGrowl
 
