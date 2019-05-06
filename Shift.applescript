@@ -110,7 +110,7 @@ on main(q)
 	tell application "OmniFocus"
 		tell content of first document window of front document
 			--Get selection
-			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not context and class of its value is not perspective)
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not tag and class of its value is not perspective)
 			set totalItems to count of validSelectedItemsList
 			if totalItems is 0 then
 				set alertName to "Error"
