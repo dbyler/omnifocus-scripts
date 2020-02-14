@@ -13,6 +13,9 @@
 
 	# CHANGE HISTORY #
 
+	2020-02-14
+	-	Remove Growl code; better notification text
+
 	2018-11-01
 	-	Fix for OmniFocus 3 ("Contexts" replaced with "Tags")
 
@@ -54,9 +57,6 @@ property useGrowl : false --if true, will use Growl for success/failure alerts
 
 -- Don't change these
 property growlAppName : "Dan's Scripts"
-property allNotifications : {"General", "Error"}
-property enabledNotifications : {"General", "Error"}
-property iconApplication : "OmniFocus.app"
 
 on main()
 	tell application "OmniFocus"
@@ -69,7 +69,7 @@ on main()
 				set alertName to "Error"
 				set alertTitle to "Script failure"
 				set alertText to "No valid task(s) selected"
-				my notify(alertName, alertTitle, alertText)
+				display notification alertText with title alertTitle
 				return
 			end if
 			
@@ -90,58 +90,10 @@ on main()
 		set itemSuffix to "s"
 	end if
 	set alertName to "General"
-	set alertTitle to "Script complete"
-	set alertText to totalHours & "h " & modMinutes & "m total for " & totalItems & " item" & itemSuffix as string
-	my notify(alertName, alertTitle, alertText)
+	set alertTitle to (totalHours & "h " & modMinutes & "m total") as string
+	set alertText to ("Estimate for " & totalItems & " item" & itemSuffix) as string
+	display notification alertText with title alertTitle
 end main
 
-(* Begin notification code *)
-on notify(alertName, alertTitle, alertText)
-	--Call this to show a normal notification
-	my notifyMain(alertName, alertTitle, alertText, false)
-end notify
-
-on notifyWithSticky(alertName, alertTitle, alertText)
-	--Show a sticky Growl notification
-	my notifyMain(alertName, alertTitle, alertText, true)
-end notifyWithSticky
-
-on IsGrowlRunning()
-	tell application "System Events" to set GrowlRunning to (count of (every process where creator type is "GRRR")) > 0
-	return GrowlRunning
-end IsGrowlRunning
-
-on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
-	tell my application growlHelperAppName
-		Çevent registerÈ given Çclass applÈ:growlAppName, Çclass anotÈ:allNotifications, Çclass dnotÈ:enabledNotifications, Çclass iappÈ:iconApplication
-		Çevent notifygrÈ given Çclass nameÈ:alertName, Çclass titlÈ:alertTitle, Çclass applÈ:growlAppName, Çclass descÈ:alertText
-	end tell
-end notifyWithGrowl
-
-on NotifyWithoutGrowl(alertText, alertTitle)
-	display notification alertText with title alertTitle
-end NotifyWithoutGrowl
-
-on notifyMain(alertName, alertTitle, alertText, useSticky)
-	set GrowlRunning to my IsGrowlRunning() --check if Growl is running...
-	if not GrowlRunning then --if Growl isn't running...
-		set GrowlPath to "" --check to see if Growl is installed...
-		try
-			tell application "Finder" to tell (application file id "GRRR") to set strGrowlPath to POSIX path of (its container as alias) & name
-		end try
-		if GrowlPath is not "" then --...try to launch if so...
-			do shell script "open " & strGrowlPath & " > /dev/null 2>&1 &"
-			delay 0.5
-			set GrowlRunning to my IsGrowlRunning()
-		end if
-	end if
-	if GrowlRunning then
-		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
-		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
-	else
-		NotifyWithoutGrowl(alertText, alertTitle)
-	end if
-end notifyMain
-(* end notification code *)
 
 main()
