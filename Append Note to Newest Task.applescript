@@ -1,42 +1,36 @@
 (*
 	# DESCRIPTION #
 	
-	Appends a note to the most recently created task in OmniFocus.
+	Adds a note to the most recently created task in OmniFocus.
 	-	By default, the clipboard contents are used for the note
-	-	If triggered from LaunchBar or Alfred, you can use different text	
+	-	If triggered from LaunchBar or Alfred, you can use different text
 
 	See https://github.com/dbyler/omnifocus-scripts for updates
 
 
 	# LICENSE #
 
-	Copyright © 2015-2017 Dan Byler (contact: dbyler@gmail.com)
+	Copyright © 2015-2020 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php)
 	(TL;DR: no warranty, do whatever you want with it.)
 
 
 	# CHANGE HISTORY #
 	
+	2020-02-14
+	- Purge old Growl code; general cleanups
+	
 	2017-04-22
 	-	Minor update to notification code
 
-	1.0.1 (2015-05-17)
+	2015-05-17
 	-	Fix for attachments being overwritten by the note
 	-	Use Notification Center instead of an alert when not running Growl. Requires Mountain Lion or newer
 	
-	1.0 (2015-05-09) Original release.
-	
+	2015-05-09 Original release
 *)
 
-
--- To change settings, modify the following properties
-property showSummaryNotification : true --if true, will display success notifications
-
--- Don't change these
-property growlAppName : "Dan's Scripts"
-property allNotifications : {"General", "Error"}
-property enabledNotifications : {"General", "Error"}
-property iconApplication : "OmniFocus.app"
+property showNotification : true --if true, will display success notifications
 
 on main(q)
 	if q is missing value then
@@ -51,18 +45,14 @@ on main(q)
 			end if
 			tell myTask
 				insert q & "
-			
-			" at before first paragraph of note
+
+" at before first paragraph of note
 			end tell
-			if showSummaryNotification then
-				set alertName to "General"
-				set alertTitle to q
-				if length of alertTitle > 20 then
-					set alertTitle to (text 1 thru 20 of alertTitle) & "É"
-				end if
-				set alertText to "Note appended to: 
-" & name of myTask
-				my notify(alertName, alertTitle, alertText)
+			
+			if showNotification then
+				set alertTitle to "Note added to " & name of myTask
+				set alertText to "\"" & q & "\""
+				display notification alertText with title alertTitle
 			end if
 			
 		end tell
@@ -96,55 +86,6 @@ on getLastAddedTask()
 		end tell
 	end tell
 end getLastAddedTask
-
-(* Begin notification code *)
-on notify(alertName, alertTitle, alertText)
-	--Call this to show a normal notification
-	my notifyMain(alertName, alertTitle, alertText, false)
-end notify
-
-on notifyWithSticky(alertName, alertTitle, alertText)
-	--Show a sticky Growl notification
-	my notifyMain(alertName, alertTitle, alertText, true)
-end notifyWithSticky
-
-on IsGrowlRunning()
-	tell application "System Events" to set GrowlRunning to (count of (every process where creator type is "GRRR")) > 0
-	return GrowlRunning
-end IsGrowlRunning
-
-on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
-	tell my application growlHelperAppName
-		Çevent registerÈ given Çclass applÈ:growlAppName, Çclass anotÈ:allNotifications, Çclass dnotÈ:enabledNotifications, Çclass iappÈ:iconApplication
-		Çevent notifygrÈ given Çclass nameÈ:alertName, Çclass titlÈ:alertTitle, Çclass applÈ:growlAppName, Çclass descÈ:alertText
-	end tell
-end notifyWithGrowl
-
-on NotifyWithoutGrowl(alertText, alertTitle)
-	display notification alertText with title alertTitle
-end NotifyWithoutGrowl
-
-on notifyMain(alertName, alertTitle, alertText, useSticky)
-	set GrowlRunning to my IsGrowlRunning() --check if Growl is running...
-	if not GrowlRunning then --if Growl isn't running...
-		set GrowlPath to "" --check to see if Growl is installed...
-		try
-			tell application "Finder" to tell (application file id "GRRR") to set strGrowlPath to POSIX path of (its container as alias) & name
-		end try
-		if GrowlPath is not "" then --...try to launch if so...
-			do shell script "open " & strGrowlPath & " > /dev/null 2>&1 &"
-			delay 0.5
-			set GrowlRunning to my IsGrowlRunning()
-		end if
-	end if
-	if GrowlRunning then
-		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
-		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
-	else
-		NotifyWithoutGrowl(alertText, alertTitle)
-	end if
-end notifyMain
-(* end notification code *)
 
 main(missing value)
 
