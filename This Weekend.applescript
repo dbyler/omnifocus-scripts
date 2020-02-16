@@ -11,39 +11,42 @@
 	
 	# LICENSE #
 
-	Copyright © 2010-2017 Dan Byler (contact: dbyler@gmail.com)
+	Copyright © 2010-2020 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php)
 	
 
 	# CHANGE HISTORY #
 
+	2020-02-14
+	-	Updated for OmniFocus 3; removes Growl support; other small improvements
+
 	2017-04-23
 	-	Fixes an issue when running with certain top-level category separators selected
 	-	Minor update to notification code. Next time I'll probably remove Growl altogether
 
-	0.32 (2015-05-17)
+	2015-05-17
 	-	Use Notification Center instead of an alert when not running Growl. Requires Mountain Lion or newer
 	
-	0.31 (2011-10-31)
+	2011-10-31
 	-	Updated Growl code to work with Growl 1.3 (App Store version)
 	-	Updated tell syntax to call "first document window", not "front document window"
 	
-	0.3 (2011-08-30)
+	2011-08-30
 	-	Rewrote notification code to gracefully handle situations where Growl is not installed
 	
-	0.2 (2011-07-07)
+	2011-07-07
 	-	Setting a due date is now optional (see settings below)
 	-	No longer fails when a Grouping divider is selected
 	-	Reorganized; incorporated Rob Trew's method to get items from OmniFocus
 	-	Fixes potential issue when launching from OmniFocus toolbar
 
-	0.1c (2010-06-22)
+	2010-06-22
 		-	Actual fix for autosave
 
-	0.1b (2010-06-21)
+	2010-06-21
 		-	Encapsulated autosave in "try" statements in case this fails
 
-	0.1: Initial release. Based on my Defer script, which incorporates bug fixes from Curt Clifton. By default, notifications are disabled (uncomment the appropriate lines to enable them).
+	2010: Initial release. Based on my Defer script, which incorporates bug fixes from Curt Clifton. By default, notifications are disabled (uncomment the appropriate lines to enable them).
 
 
 	# INSTALLATION #
@@ -58,52 +61,46 @@
 *)
 
 -- To change your weekend start/stop date/time, modify the following properties
-property setDueDate : false --set to False if you don't want to change the due date
-property weEndDay : Sunday
-property weEndTime : 17 --due time in hours (24 hr clock)
-property weStartDay : Friday
-property weStartTime : 20 --due time in hrs (24 hr clock)
+property setDueDate : false --if False, will not modify the due date; if True, sets due date
+property deferDay : Friday
+property deferHour : 18 --due time in hrs (24 hr clock)
+property dueDay : Sunday
+property dueHour : 16 --due time in hours (24 hr clock)
 
 --To enable alerts, change these settings to True _and_ uncomment
 property showSummaryNotification : true --if true, will display success notifications
-property useGrowl : true --if true, will use Growl for success/failure alerts
 
 -- Don't change these
 property alertItemNum : ""
 property alertDayNum : ""
 property dueDate : ""
-property growlAppName : "Dan's Scripts"
-property allNotifications : {"General", "Error"}
-property enabledNotifications : {"General", "Error"}
-property iconApplication : "OmniFocus.app"
 
 on main()
 	tell application "OmniFocus"
 		tell content of first document window of front document
 			--Get selection
-			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not context and class of its value is not perspective)
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not tag and class of its value is not perspective)
 			set totalItems to count of validSelectedItemsList
 			if totalItems is 0 then
-				set alertName to "Error"
 				set alertTitle to "Script failure"
 				set alertText to "No valid task(s) selected"
-				my notify(alertName, alertTitle, alertText)
+				display notification alertText with title alertTitle
 				return
 			end if
 			
 			--Calculate due date
 			set dueDate to current date
 			set theTime to time of dueDate
-			repeat while weekday of dueDate is not weEndDay
+			repeat while weekday of dueDate is not dueDay
 				set dueDate to dueDate + 1 * days
 			end repeat
-			set dueDate to dueDate - theTime + weEndTime * hours
+			set dueDate to dueDate - theTime + dueHour * hours
 			--set dueDate to dueDate + 1 * weeks --uncomment to use _next_ weekend instead
 			
 			--Calculate start date
-			set diff to weEndDay - weStartDay
+			set diff to dueDay - deferDay
 			if diff < 0 then set diff to diff + 7
-			set diff to diff * days + (weEndTime - weStartTime) * hours
+			set diff to diff * days + (dueHour - deferHour) * hours
 			set startDate to dueDate - diff
 			
 			--Perform action
@@ -120,8 +117,8 @@ on main()
 	--Display summary notification
 	if showSummaryNotification then
 		if successTot > 1 then set alertItemNum to "s"
-		set alertText to successTot & " item" & alertItemNum & " now due this weekend." as string
-		my notify("General", "Script complete", alertText)
+		set alertText to successTot & " item" & alertItemNum & " set to this weekend." as string
+		display notification alertText with title "Script complete"
 	end if
 end main
 
@@ -136,55 +133,6 @@ on setDate(selectedItem, startDate, dueDate)
 	end tell
 	return success
 end setDate
-
-(* Begin notification code *)
-on notify(alertName, alertTitle, alertText)
-	--Call this to show a normal notification
-	my notifyMain(alertName, alertTitle, alertText, false)
-end notify
-
-on notifyWithSticky(alertName, alertTitle, alertText)
-	--Show a sticky Growl notification
-	my notifyMain(alertName, alertTitle, alertText, true)
-end notifyWithSticky
-
-on IsGrowlRunning()
-	tell application "System Events" to set GrowlRunning to (count of (every process where creator type is "GRRR")) > 0
-	return GrowlRunning
-end IsGrowlRunning
-
-on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
-	tell my application growlHelperAppName
-		Çevent registerÈ given Çclass applÈ:growlAppName, Çclass anotÈ:allNotifications, Çclass dnotÈ:enabledNotifications, Çclass iappÈ:iconApplication
-		Çevent notifygrÈ given Çclass nameÈ:alertName, Çclass titlÈ:alertTitle, Çclass applÈ:growlAppName, Çclass descÈ:alertText
-	end tell
-end notifyWithGrowl
-
-on NotifyWithoutGrowl(alertText, alertTitle)
-	display notification alertText with title alertTitle
-end NotifyWithoutGrowl
-
-on notifyMain(alertName, alertTitle, alertText, useSticky)
-	set GrowlRunning to my IsGrowlRunning() --check if Growl is running...
-	if not GrowlRunning then --if Growl isn't running...
-		set GrowlPath to "" --check to see if Growl is installed...
-		try
-			tell application "Finder" to tell (application file id "GRRR") to set strGrowlPath to POSIX path of (its container as alias) & name
-		end try
-		if GrowlPath is not "" then --...try to launch if so...
-			do shell script "open " & strGrowlPath & " > /dev/null 2>&1 &"
-			delay 0.5
-			set GrowlRunning to my IsGrowlRunning()
-		end if
-	end if
-	if GrowlRunning then
-		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
-		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
-	else
-		NotifyWithoutGrowl(alertText, alertTitle)
-	end if
-end notifyMain
-(* end notification code *)
 
 
 main()

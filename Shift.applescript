@@ -11,7 +11,7 @@
 	
 	# LICENSE #
 
-	Copyright © 2008-2017 Dan Byler (contact: dbyler@gmail.com)
+	Copyright © 2008-2020 Dan Byler (contact: dbyler@gmail.com)
 	Licensed under MIT License (http://www.opensource.org/licenses/mit-license.php)
 	(TL;DR: no warranty, do whatever you want with it.)
 	
@@ -23,6 +23,9 @@
 
 	# CHANGE HISTORY#
 	
+	2020-02-14
+	-	Updated for OmniFocus 3; removes Growl support; other small improvements
+
 	2017-04-22
 	-	Fixes an issue when running with certain top-level category separators selected
 	-	Minor update to notification code
@@ -89,7 +92,6 @@
 -- To change settings, modify the following properties
 property snoozeUnscheduledItems : false --if True, when deferring Start AND Due dates, will set start date to given # of days in the future
 property showSummaryNotification : true --if true, will display success notifications
-property useGrowl : true --if true, will use Growl for success/failure alerts
 property defaultOffset : 1 --number of days to defer by default
 property defaultStartTime : 6 --default time to use (in hours, 24-hr clock)
 property warnOnDateMismatch : true --if True, warns you if there's a mismatch between a deferred item's actual and effective Due date. An effective due date is set by a parent task or project.
@@ -101,22 +103,17 @@ property changeScope : "Start and Due" --options: "Start and Due", "Due Only", "
 -- Don't change these
 property alertItemNum : ""
 property alertDayNum : ""
-property growlAppName : "Dan's Scripts"
-property allNotifications : {"General", "Error"}
-property enabledNotifications : {"General", "Error"}
-property iconApplication : "OmniFocus.app"
 
 on main(q)
 	tell application "OmniFocus"
 		tell content of first document window of front document
 			--Get selection
-			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not context and class of its value is not perspective)
+			set validSelectedItemsList to value of (selected trees where class of its value is not item and class of its value is not folder and class of its value is not tag and class of its value is not perspective)
 			set totalItems to count of validSelectedItemsList
 			if totalItems is 0 then
-				set alertName to "Error"
 				set alertTitle to "Script failure"
 				set alertText to "No valid task(s) selected"
-				my notify(alertName, alertTitle, alertText)
+				display notification alertText with title alertTitle
 				return
 			end if
 			
@@ -135,10 +132,9 @@ on main(q)
 				try
 					set daysOffset to (run script res) as real
 				on error
-					set alertName to "Error"
 					set alertTitle to "Script failure"
 					set alertText to "Error interpreting your input. Please try an integer or fraction."
-					my notify(alertName, alertTitle, alertText)
+					display notification alertText with title alertTitle
 					return
 				end try
 			end try
@@ -173,12 +169,11 @@ on main(q)
 	
 	--Display summary notification
 	if showSummaryNotification then
-		set alertName to "General"
 		set alertTitle to "Script complete"
 		if daysOffset is not 1 then set alertDayNum to "s"
 		if successTot > 1 then set alertItemNum to "s"
 		set alertText to successTot & " item" & alertItemNum & " deferred " & daysOffset & " day" & alertDayNum & ". (" & changeScope & ")" as string
-		my notify(alertName, alertTitle, alertText)
+		display notification alertText with title alertTitle
 	end if
 end main
 
@@ -199,7 +194,7 @@ on defer(selectedItem, daysOffset, modifyStartDate, modifyDueDate, todayStart)
 							set alertText to "Ç" & (name of contents of selectedItem) & Â
 								"È has a later effective start date inherited from Ç" & (name of contents of dueAncestor) & Â
 								"È. The latter has not been changed."
-							my notifyWithSticky("Error", "Possible Start Date Mismatch", alertText)
+							display notification "Possible start date mismatch" with title "Warning"
 						end if
 					end if
 				end if
@@ -268,56 +263,6 @@ end getEffectiveStartDate
 on offsetDateByDays(myDate, daysOffset)
 	return myDate + (86400 * daysOffset)
 end offsetDateByDays
-
-
-(* Begin notification code *)
-on notify(alertName, alertTitle, alertText)
-	--Call this to show a normal notification
-	my notifyMain(alertName, alertTitle, alertText, false)
-end notify
-
-on notifyWithSticky(alertName, alertTitle, alertText)
-	--Show a sticky Growl notification
-	my notifyMain(alertName, alertTitle, alertText, true)
-end notifyWithSticky
-
-on IsGrowlRunning()
-	tell application "System Events" to set GrowlRunning to (count of (every process where creator type is "GRRR")) > 0
-	return GrowlRunning
-end IsGrowlRunning
-
-on notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
-	tell my application growlHelperAppName
-		Çevent registerÈ given Çclass applÈ:growlAppName, Çclass anotÈ:allNotifications, Çclass dnotÈ:enabledNotifications, Çclass iappÈ:iconApplication
-		Çevent notifygrÈ given Çclass nameÈ:alertName, Çclass titlÈ:alertTitle, Çclass applÈ:growlAppName, Çclass descÈ:alertText
-	end tell
-end notifyWithGrowl
-
-on NotifyWithoutGrowl(alertText, alertTitle)
-	display notification alertText with title alertTitle
-end NotifyWithoutGrowl
-
-on notifyMain(alertName, alertTitle, alertText, useSticky)
-	set GrowlRunning to my IsGrowlRunning() --check if Growl is running...
-	if not GrowlRunning then --if Growl isn't running...
-		set GrowlPath to "" --check to see if Growl is installed...
-		try
-			tell application "Finder" to tell (application file id "GRRR") to set strGrowlPath to POSIX path of (its container as alias) & name
-		end try
-		if GrowlPath is not "" then --...try to launch if so...
-			do shell script "open " & strGrowlPath & " > /dev/null 2>&1 &"
-			delay 0.5
-			set GrowlRunning to my IsGrowlRunning()
-		end if
-	end if
-	if GrowlRunning then
-		tell application "Finder" to tell (application file id "GRRR") to set growlHelperAppName to name
-		notifyWithGrowl(growlHelperAppName, alertName, alertTitle, alertText, useSticky)
-	else
-		NotifyWithoutGrowl(alertText, alertTitle)
-	end if
-end notifyMain
-(* end notification code *)
 
 
 main(missing value)
